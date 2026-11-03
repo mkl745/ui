@@ -16,6 +16,7 @@ data class LauncherApp(
     val searchOnly: Boolean = false,
     val groupName: String? = null,
     val customIconUri: String? = null,
+    val category: String? = null,
 )
 
 data class IconPack(val packageName: String, val label: String)

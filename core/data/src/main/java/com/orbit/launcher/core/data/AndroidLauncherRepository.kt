@@ -12,6 +12,7 @@ import android.media.AudioManager
 import android.os.BatteryManager
 import java.util.Calendar
 import android.content.pm.LauncherApps
+import android.content.pm.ApplicationInfo
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.graphics.Bitmap
@@ -122,6 +123,18 @@ class AndroidLauncherRepository @Inject constructor(
                     userSerial = serial,
                     label = activity.label.toString(),
                     isWorkProfile = profile != Process.myUserHandle(),
+                    category = when (activity.applicationInfo.category) {
+                        ApplicationInfo.CATEGORY_GAME -> "Games"
+                        ApplicationInfo.CATEGORY_AUDIO -> "Audio"
+                        ApplicationInfo.CATEGORY_VIDEO -> "Video"
+                        ApplicationInfo.CATEGORY_IMAGE -> "Images"
+                        ApplicationInfo.CATEGORY_SOCIAL -> "Social"
+                        ApplicationInfo.CATEGORY_NEWS -> "News"
+                        ApplicationInfo.CATEGORY_MAPS -> "Maps"
+                        ApplicationInfo.CATEGORY_PRODUCTIVITY -> "Productivity"
+                        ApplicationInfo.CATEGORY_ACCESSIBILITY -> "Accessibility"
+                        else -> null
+                    },
                 )
             }
         } catch (_: SecurityException) {

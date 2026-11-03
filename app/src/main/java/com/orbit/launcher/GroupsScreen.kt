@@ -22,11 +22,16 @@ import com.orbit.launcher.core.domain.LauncherSettings
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GroupsScreen(apps: List<LauncherApp>, settings: LauncherSettings, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onMenu: (LauncherApp) -> Unit, onBack: () -> Unit) {
-    val groups = remember(apps) { apps.filter { !it.hidden && !it.groupName.isNullOrBlank() }.groupBy { it.groupName!! }.toSortedMap() }
+    val groups = remember(apps) {
+        val visible = apps.filter { !it.hidden && !it.searchOnly }
+        val custom = visible.filter { !it.groupName.isNullOrBlank() }.groupBy { "GROUP · ${it.groupName}" }
+        val smart = visible.filter { it.groupName.isNullOrBlank() && it.category != null }.groupBy { "SMART · ${it.category}" }
+        (custom + smart).toSortedMap()
+    }
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Groups", style = MaterialTheme.typography.headlineLarge)
-        Text("Long-press an app in your orbit to add it to a group.", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+        Text("Long-press an app in your orbit to add it to a group. Smart groups use Android app categories.", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
         if (groups.isEmpty()) Text("No groups yet", modifier = Modifier.padding(vertical = 24.dp))
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 16.dp)) {
             groups.forEach { (name, members) ->
