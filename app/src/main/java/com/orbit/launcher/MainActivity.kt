@@ -45,7 +45,8 @@ class MainActivity : FragmentActivity() {
             val roleLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { isDefaultHome = checkDefaultHome() }
-            OrbitTheme {
+            val themeSettings by viewModel.settings.collectAsState()
+            OrbitTheme(themeSettings) {
                 var skippedSetup by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(homeRequests) { if (homeRequests > 0) skippedSetup = false }
                 if (isDefaultHome || skippedSetup) {

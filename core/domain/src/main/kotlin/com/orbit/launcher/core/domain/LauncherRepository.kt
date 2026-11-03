@@ -23,6 +23,11 @@ data class LauncherSettings(
     val iconSize: Int = 48,
     val webSearch: Boolean = false,
     val lockHidden: Boolean = false,
+    val themeMode: String = "dark",
+    val dynamicColor: Boolean = false,
+    val palette: String = "violet",
+    val font: String = "sans",
+    val cornerRadius: Int = 20,
 )
 
 interface LauncherRepository {

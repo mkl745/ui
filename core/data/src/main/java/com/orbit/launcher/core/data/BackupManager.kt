@@ -27,7 +27,9 @@ class BackupManager @Inject constructor(
                 .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL))
         }
         val json = JSONObject().put("version", 1).put("apps", entries).put("settings", JSONObject()
-            .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch))
+            .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch)
+            .put("themeMode", settings.themeMode).put("dynamicColor", settings.dynamicColor).put("palette", settings.palette)
+            .put("font", settings.font).put("cornerRadius", settings.cornerRadius))
         val stream = context.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open backup")
         stream.bufferedWriter(Charsets.UTF_8).use { it.write(json.toString()) }
     }
@@ -40,7 +42,12 @@ class BackupManager @Inject constructor(
         val settingsJson = json.getJSONObject("settings")
         val iconSize = settingsJson.getInt("iconSize")
         require(iconSize in 32..72)
-        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden)
+        val themeMode = settingsJson.optString("themeMode", "dark")
+        val palette = settingsJson.optString("palette", "violet")
+        val font = settingsJson.optString("font", "sans")
+        val radius = settingsJson.optInt("cornerRadius", 20)
+        require(themeMode in setOf("system", "dark", "light", "amoled") && palette in setOf("violet", "cyan", "amber") && font in setOf("sans", "serif", "mono") && radius in 0..32)
+        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden, themeMode, settingsJson.optBoolean("dynamicColor", false), palette, font, radius)
         val array = json.getJSONArray("apps")
         require(array.length() <= 10_000)
         val entries = (0 until array.length()).map { index ->

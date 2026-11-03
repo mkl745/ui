@@ -14,6 +14,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherRepository
@@ -47,6 +48,11 @@ private val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
 private val ICON_SIZE = intPreferencesKey("icon_size")
 private val WEB_SEARCH = booleanPreferencesKey("web_search")
 private val LOCK_HIDDEN = booleanPreferencesKey("lock_hidden")
+private val THEME_MODE = stringPreferencesKey("theme_mode")
+private val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+private val PALETTE = stringPreferencesKey("palette")
+private val FONT = stringPreferencesKey("font")
+private val CORNER_RADIUS = intPreferencesKey("corner_radius")
 
 @Singleton
 class AndroidLauncherRepository @Inject constructor(
@@ -112,7 +118,13 @@ class AndroidLauncherRepository @Inject constructor(
     }
 
     override val settings = context.launcherSettings.data.map {
-        LauncherSettings(it[SHOW_LABELS] ?: true, it[REDUCE_MOTION] ?: false, (it[ICON_SIZE] ?: 48).coerceIn(32, 72), it[WEB_SEARCH] ?: false, it[LOCK_HIDDEN] ?: false)
+        LauncherSettings(
+            showLabels = it[SHOW_LABELS] ?: true, reduceMotion = it[REDUCE_MOTION] ?: false,
+            iconSize = (it[ICON_SIZE] ?: 48).coerceIn(32, 72), webSearch = it[WEB_SEARCH] ?: false,
+            lockHidden = it[LOCK_HIDDEN] ?: false, themeMode = it[THEME_MODE] ?: "dark",
+            dynamicColor = it[DYNAMIC_COLOR] ?: false, palette = it[PALETTE] ?: "violet",
+            font = it[FONT] ?: "sans", cornerRadius = (it[CORNER_RADIUS] ?: 20).coerceIn(0, 32),
+        )
     }
 
     override suspend fun updateSettings(settings: LauncherSettings) {
@@ -122,6 +134,11 @@ class AndroidLauncherRepository @Inject constructor(
             it[ICON_SIZE] = settings.iconSize.coerceIn(32, 72)
             it[WEB_SEARCH] = settings.webSearch
             it[LOCK_HIDDEN] = settings.lockHidden
+            it[THEME_MODE] = settings.themeMode.takeIf { value -> value in setOf("system", "dark", "light", "amoled") } ?: "dark"
+            it[DYNAMIC_COLOR] = settings.dynamicColor
+            it[PALETTE] = settings.palette.takeIf { value -> value in setOf("violet", "cyan", "amber") } ?: "violet"
+            it[FONT] = settings.font.takeIf { value -> value in setOf("sans", "serif", "mono") } ?: "sans"
+            it[CORNER_RADIUS] = settings.cornerRadius.coerceIn(0, 32)
         }
     }
 

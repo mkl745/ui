@@ -38,6 +38,24 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
             Switch(settings.reduceMotion, { onChange(settings.copy(reduceMotion = it)) })
         }
         Spacer(Modifier.height(24.dp))
+        Text("Appearance", style = MaterialTheme.typography.titleMedium)
+        Text("Theme: ${settings.themeMode}", style = MaterialTheme.typography.bodyMedium)
+        Row { listOf("system", "dark", "light", "amoled").forEach { mode ->
+            TextButton(onClick = { onChange(settings.copy(themeMode = mode)) }, contentPadding = PaddingValues(horizontal = 6.dp)) { Text(mode) }
+        } }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Material You"); Text("Uses system colors on Android 12+", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.dynamicColor, { onChange(settings.copy(dynamicColor = it)) })
+        }
+        if (!settings.dynamicColor) Row { listOf("violet", "cyan", "amber").forEach { palette ->
+            TextButton(onClick = { onChange(settings.copy(palette = palette)) }) { Text(palette) }
+        } }
+        Row { listOf("sans", "serif", "mono").forEach { font ->
+            TextButton(onClick = { onChange(settings.copy(font = font)) }) { Text(font) }
+        } }
+        Text("Corner radius · ${settings.cornerRadius} dp")
+        Slider(settings.cornerRadius.toFloat(), { onChange(settings.copy(cornerRadius = it.toInt())) }, valueRange = 0f..32f)
+        Spacer(Modifier.height(16.dp))
         Text("Icon size · ${settings.iconSize} dp")
         Slider(settings.iconSize.toFloat(), { onChange(settings.copy(iconSize = it.toInt())) }, valueRange = 32f..72f)
         Spacer(Modifier.height(16.dp))

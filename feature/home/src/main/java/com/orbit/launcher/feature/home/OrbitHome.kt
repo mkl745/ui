@@ -63,11 +63,11 @@ fun OrbitHome(
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
-    Column(Modifier.fillMaxSize().background(Color(0xFF090C15)).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("O R B I T", color = Color(0xFFB7C7FF), fontSize = 12.sp)
-                Text("YOUR SPACE", color = Color(0xFF77819D), fontSize = 10.sp, letterSpacing = 2.sp)
+                Text("O R B I T", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                Text("YOUR SPACE", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, letterSpacing = 2.sp)
             }
             Row { TextButton(onClick = onGroups) { Text("Groups") }; TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
         }
@@ -98,7 +98,7 @@ fun OrbitHome(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            val ringColor = Color(0xFF8198F7)
+            val ringColor = MaterialTheme.colorScheme.primary
             Canvas(Modifier.fillMaxSize()) {
                 listOf(.22f, .36f, .46f).forEach { r ->
                     drawCircle(ringColor.copy(alpha = .18f), radius = size.minDimension * r, style = Stroke(1.dp.toPx()))
@@ -122,14 +122,14 @@ fun OrbitHome(
                 }
             }
             Box(
-                Modifier.size(68.dp).clip(CircleShape).background(Color(0xFFB8C7FF))
+                Modifier.size(68.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
                     .combinedClickable(onClick = onSearch, onLongClick = onSettings)
                     .semantics { contentDescription = "Search apps" },
                 contentAlignment = Alignment.Center,
-            ) { Text("⌕", fontSize = 34.sp, color = Color(0xFF182553)) }
+            ) { Text("⌕", fontSize = 34.sp, color = MaterialTheme.colorScheme.onPrimary) }
         }
         Spacer(Modifier.weight(1f))
-        Text("DRAG TO ROTATE  ·  SWIPE UP OR TAP TO SEARCH", color = Color(0xFF78839F), fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
+        Text("DRAG TO ROTATE  ·  SWIPE UP OR TAP TO SEARCH", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
         TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 16.dp)) { Text("ALL APPS  ↗") }
     }
 }
@@ -151,11 +151,11 @@ fun AppOrb(
         Modifier.width(76.dp).combinedClickable(onClickLabel = "Open ${app.label}", onLongClickLabel = "Actions for ${app.label}", onClick = { onLaunch(app) }, onLongClick = { onMenu(app) }),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(settings.iconSize.dp).clip(CircleShape).background(Color(0xFF222A43)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(settings.iconSize.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
             if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = if (settings.showLabels) null else app.label, modifier = Modifier.fillMaxSize())
-            else Text(app.label.take(1), color = Color.White)
+            else Text(app.label.take(1), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (badgeCount > 0) Text("● $badgeCount", color = Color(0xFFBBC7FF), fontSize = 9.sp)
-        if (settings.showLabels) Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color(0xFFE5E9FC), fontSize = 10.sp, textAlign = TextAlign.Center)
+        if (badgeCount > 0) Text("● $badgeCount", color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
+        if (settings.showLabels) Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground, fontSize = 10.sp, textAlign = TextAlign.Center)
     }
 }
