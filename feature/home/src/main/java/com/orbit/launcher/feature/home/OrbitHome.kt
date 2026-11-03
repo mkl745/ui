@@ -44,6 +44,7 @@ import kotlin.math.sin
 fun OrbitHome(
     apps: List<LauncherApp>,
     settings: LauncherSettings,
+    badgeCounts: Map<String, Int>,
     loadIcon: suspend (LauncherApp, Int) -> Bitmap?,
     onLaunch: (LauncherApp) -> Unit,
     onMenu: (LauncherApp) -> Unit,
@@ -105,7 +106,7 @@ fun OrbitHome(
                     val x = radius * cos(angle).toFloat()
                     val y = radius * sin(angle).toFloat()
                     Box(Modifier.offset(x = x, y = y)) {
-                        AppOrb(app, settings, loadIcon, onLaunch, onMenu)
+                        AppOrb(app, settings, if (app.isWorkProfile) 0 else badgeCounts[app.packageName] ?: 0, loadIcon, onLaunch, onMenu)
                     }
                 }
             }
@@ -127,6 +128,7 @@ fun OrbitHome(
 fun AppOrb(
     app: LauncherApp,
     settings: LauncherSettings,
+    badgeCount: Int,
     loadIcon: suspend (LauncherApp, Int) -> Bitmap?,
     onLaunch: (LauncherApp) -> Unit,
     onMenu: (LauncherApp) -> Unit,
@@ -142,6 +144,7 @@ fun AppOrb(
             if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = if (settings.showLabels) null else app.label, modifier = Modifier.fillMaxSize())
             else Text(app.label.take(1), color = Color.White)
         }
+        if (badgeCount > 0) Text("● $badgeCount", color = Color(0xFFBBC7FF), fontSize = 9.sp)
         if (settings.showLabels) Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color(0xFFE5E9FC), fontSize = 10.sp, textAlign = TextAlign.Center)
     }
 }

@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Orbit</string>
     <string name="home_settings_unavailable">Home settings are unavailable on this device.</string>
+    <string name="badge_service_name">Orbit notification badges</string>
 </resources>

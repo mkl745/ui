@@ -3,6 +3,10 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   debug:
     runs-on: ubuntu-latest
@@ -13,8 +17,30 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:assembleDebug :core:domain:test
+      - name: Compile and test
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug :core:domain:test 2>&1 | tee "$RUNNER_TEMP/gradle-output.txt"
+      - name: Publish build diagnostics
+        if: steps.build.outcome == 'failure' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          log = Path(os.environ['RUNNER_TEMP'], 'gradle-output.txt').read_text(errors='replace')[-50000:]
+          payload = {'name': 'Android build diagnostics', 'head_sha': os.environ['GITHUB_SHA'], 'status': 'completed', 'conclusion': 'failure', 'output': {'title': 'Gradle build failed', 'summary': 'See the captured Gradle output.', 'text': '```\n' + log.replace('```', "'''") + '\n```'}}
+          Path(os.environ['RUNNER_TEMP'], 'diagnostics.json').write_text(json.dumps(payload))
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/check-runs" --method POST --input "$RUNNER_TEMP/diagnostics.json"
+      - name: Fail on build error
+        if: steps.build.outcome == 'failure'
+        run: exit 1
       - uses: actions/upload-artifact@v4
+        if: steps.build.outcome == 'success'
         with:
           name: orbit-debug
           path: app/build/outputs/apk/debug/app-debug.apk

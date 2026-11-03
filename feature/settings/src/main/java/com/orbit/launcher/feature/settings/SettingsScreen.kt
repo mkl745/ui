@@ -12,7 +12,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, onUnhide: (LauncherApp) -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, onUnhide: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -31,6 +31,14 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         Spacer(Modifier.height(24.dp))
         Text("Icon size · ${settings.iconSize} dp")
         Slider(settings.iconSize.toFloat(), { onChange(settings.copy(iconSize = it.toInt())) }, valueRange = 32f..72f)
+        Spacer(Modifier.height(16.dp))
+        Text("Notification badges", style = MaterialTheme.typography.titleMedium)
+        Text("Allow notification access to show counts. Orbit does not store notification contents.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        TextButton(onClick = onNotificationAccess) { Text("Manage notification access") }
+        Spacer(Modifier.height(16.dp))
+        Text("Backup", style = MaterialTheme.typography.titleMedium)
+        Text("Save or restore app preferences and settings as JSON. Profile identifiers may differ on another device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        Row { TextButton(onClick = onExport) { Text("Export") }; TextButton(onClick = onRestore) { Text("Restore") } }
         val hidden = apps.filter { it.hidden }.sortedBy { it.label.lowercase() }
         Spacer(Modifier.height(16.dp))
         Text("Hidden apps", style = MaterialTheme.typography.titleMedium)

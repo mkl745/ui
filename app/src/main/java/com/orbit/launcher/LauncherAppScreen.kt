@@ -6,6 +6,9 @@ import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
@@ -22,11 +25,25 @@ import com.orbit.launcher.feature.settings.SettingsScreen
 fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            val success = runCatching { viewModel.exportBackup(uri) }.isSuccess
+            Toast.makeText(context, if (success) "Backup saved" else "Could not save backup", Toast.LENGTH_LONG).show()
+        }
+    }
+    val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val success = runCatching { viewModel.restoreBackup(uri) }.isSuccess
+            Toast.makeText(context, if (success) "Backup restored" else "Invalid or unreadable backup", Toast.LENGTH_LONG).show()
+        }
+    }
     LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false }
     BackHandler(enabled = screen != "home" || selected != null) {
         if (selected != null) { selected = null; renaming = false } else screen = "home"
@@ -34,8 +51,11 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     Surface(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (screen) {
             "search" -> SearchScreen(apps, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
-            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::hide, { screen = "home" })
-            else -> OrbitHome(apps, settings, viewModel::icon, viewModel::launch, { selected = it }, { screen = "search" }, { screen = "settings" })
+            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
+                try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, { screen = "home" })
+            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { screen = "search" }, { screen = "settings" })
         }
     }
     selected?.let { app ->
@@ -48,11 +68,20 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
                 dismissButton = { TextButton(onClick = { renaming = false; selected = null }) { Text("Cancel") } },
             )
         } else {
+            val shortcuts by produceState(emptyList<com.orbit.launcher.core.data.AndroidLauncherRepository.AppShortcut>(), app.key) {
+                value = viewModel.shortcuts(app)
+            }
             AlertDialog(
                 onDismissRequest = { selected = null },
                 title = { Text(app.label) },
                 text = {
                     androidx.compose.foundation.layout.Column {
+                        shortcuts.take(5).forEach { shortcut ->
+                            TextButton(onClick = {
+                                if (!viewModel.launchShortcut(app, shortcut.id)) Toast.makeText(context, "Shortcut unavailable", Toast.LENGTH_SHORT).show()
+                                selected = null
+                            }) { Text(shortcut.label) }
+                        }
                         TextButton(onClick = { viewModel.pin(app); selected = null }) { Text(if (app.pinned) "Unpin from inner orbit" else "Pin to inner orbit") }
                         TextButton(onClick = { newName = app.label; renaming = true }) { Text("Rename") }
                         TextButton(onClick = { viewModel.hide(app); selected = null }) { Text("Hide app") }

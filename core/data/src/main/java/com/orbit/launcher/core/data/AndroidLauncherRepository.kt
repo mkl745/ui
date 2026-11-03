@@ -135,6 +135,27 @@ class AndroidLauncherRepository @Inject constructor(
         } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
     }
 
+    data class AppShortcut(val id: String, val label: String)
+
+    suspend fun shortcuts(app: LauncherApp): List<AppShortcut> = withContext(Dispatchers.IO) {
+        try {
+            val profile = user(app.userSerial) ?: return@withContext emptyList()
+            if (!launcher.hasShortcutHostPermission()) return@withContext emptyList()
+            val query = LauncherApps.ShortcutQuery().setPackage(app.packageName).setQueryFlags(
+                LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED,
+            )
+            launcher.getShortcuts(query, profile).orEmpty().map { AppShortcut(it.id, (it.shortLabel ?: it.id).toString()) }
+        } catch (_: SecurityException) { emptyList() } catch (_: IllegalStateException) { emptyList() }
+    }
+
+    fun launchShortcut(app: LauncherApp, id: String): Boolean {
+        val profile = user(app.userSerial) ?: return false
+        return try {
+            launcher.startShortcut(app.packageName, id, null, null, profile)
+            true
+        } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
+    }
+
     suspend fun icon(app: LauncherApp, pixels: Int): Bitmap? = withContext(Dispatchers.IO) {
         val cacheKey = "${app.key}:$pixels"
         iconCache.get(cacheKey) ?: try {

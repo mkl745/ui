@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "app_preferences")
@@ -30,6 +31,21 @@ interface AppPreferenceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(preference: AppPreference)
+
+    @Query("SELECT * FROM app_preferences")
+    suspend fun all(): List<AppPreference>
+
+    @Query("DELETE FROM app_preferences")
+    suspend fun clear()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(preferences: List<AppPreference>)
+
+    @Transaction
+    suspend fun replaceAll(preferences: List<AppPreference>) {
+        clear()
+        putAll(preferences)
+    }
 }
 
 @Database(entities = [AppPreference::class], version = 1, exportSchema = false)
