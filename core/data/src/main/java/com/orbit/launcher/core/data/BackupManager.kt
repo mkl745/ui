@@ -1,5 +1,8 @@
 package com.orbit.launcher.core.data
 
+import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import com.orbit.launcher.core.domain.LauncherRepository
@@ -17,6 +20,7 @@ class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AppPreferenceDao,
     private val repository: LauncherRepository,
+    private val widgetDao: WidgetDao,
 ) {
     suspend fun export(uri: Uri) = withContext(Dispatchers.IO) {
         val settings = repository.settings.first()
@@ -26,7 +30,13 @@ class BackupManager @Inject constructor(
                 .put("label", item.customLabel ?: JSONObject.NULL).put("launches", item.launches).put("lastLaunched", item.lastLaunched)
                 .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL).put("customIconUri", item.customIconUri ?: JSONObject.NULL))
         }
-        val json = JSONObject().put("version", 1).put("apps", entries).put("settings", JSONObject()
+        val manager = AppWidgetManager.getInstance(context)
+        val widgetEntries = JSONArray()
+        widgetDao.all().forEach { widget ->
+            val provider = widget.providerName ?: manager.getAppWidgetInfo(widget.widgetId)?.provider?.flattenToString()
+            if (provider != null) widgetEntries.put(JSONObject().put("provider", provider).put("heightDp", widget.heightDp))
+        }
+        val json = JSONObject().put("widgets", widgetEntries).put("version", 1).put("apps", entries).put("settings", JSONObject()
             .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch)
             .put("themeMode", settings.themeMode).put("dynamicColor", settings.dynamicColor).put("palette", settings.palette)
             .put("font", settings.font).put("cornerRadius", settings.cornerRadius).put("iconShape", settings.iconShape).put("themedIcons", settings.themedIcons)
@@ -72,7 +82,33 @@ class BackupManager @Inject constructor(
             AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last, item.optBoolean("searchOnly", false), group, iconUri)
         }
         require(entries.map { it.key }.distinct().size == entries.size)
+        val widgetSpecs = if (json.has("widgets")) {
+            val list = json.getJSONArray("widgets")
+            require(list.length() <= 100)
+            (0 until list.length()).map { index ->
+                val item = list.getJSONObject(index)
+                val provider = item.getString("provider")
+                val height = item.getInt("heightDp")
+                require(provider.length <= 1024 && ComponentName.unflattenFromString(provider) != null && height in 100..600)
+                provider to height
+            }
+        } else null
+        val oldWidgets = if (widgetSpecs != null) widgetDao.all() else emptyList()
+        val manager = AppWidgetManager.getInstance(context)
+        val remaining = oldWidgets.toMutableList()
+        val restoredWidgets = widgetSpecs?.mapIndexed { index, (provider, height) ->
+            val reusable = remaining.firstOrNull { item ->
+                item.widgetId >= 0 && manager.getAppWidgetInfo(item.widgetId)?.provider?.flattenToString() == provider
+            }
+            if (reusable != null) { remaining.remove(reusable); WidgetPlacement(reusable.widgetId, height, provider) }
+            else WidgetPlacement(-2 - index, height, provider)
+        }
         dao.replaceAll(entries)
+        if (restoredWidgets != null) {
+            widgetDao.replaceAll(restoredWidgets)
+            val host = AppWidgetHost(context, 1024)
+            remaining.filter { it.widgetId >= 0 }.forEach { host.deleteAppWidgetId(it.widgetId) }
+        }
         repository.updateSettings(settings)
     }
 }

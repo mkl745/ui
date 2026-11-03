@@ -56,6 +56,7 @@ interface AppPreferenceDao {
 data class WidgetPlacement(
     @PrimaryKey val widgetId: Int,
     val heightDp: Int = 180,
+    val providerName: String? = null,
 )
 
 @Dao
@@ -68,6 +69,21 @@ interface WidgetDao {
 
     @Query("DELETE FROM widgets WHERE widgetId = :id")
     suspend fun delete(id: Int)
+
+    @Query("SELECT * FROM widgets ORDER BY widgetId")
+    suspend fun all(): List<WidgetPlacement>
+
+    @Query("DELETE FROM widgets")
+    suspend fun clear()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(widgets: List<WidgetPlacement>)
+
+    @Transaction
+    suspend fun replaceAll(widgets: List<WidgetPlacement>) { clear(); putAll(widgets) }
+
+    @Transaction
+    suspend fun replacePlaceholder(placeholderId: Int, widget: WidgetPlacement) { delete(placeholderId); put(widget) }
 }
 
 @Entity(tableName = "usage_context")
@@ -91,7 +107,7 @@ interface UsageContextDao {
     @Query("DELETE FROM usage_context") suspend fun clear()
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 5, exportSchema = false)
+@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 6, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao

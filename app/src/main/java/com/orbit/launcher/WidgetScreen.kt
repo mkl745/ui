@@ -26,6 +26,7 @@ fun WidgetScreen(
     onAdd: (AppWidgetProviderInfo) -> Unit,
     onResize: (WidgetPlacement, Int) -> Unit,
     onRemove: (WidgetPlacement) -> Unit,
+    onRebind: (WidgetPlacement, AppWidgetProviderInfo) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -45,14 +46,16 @@ fun WidgetScreen(
         if (widgets.isEmpty()) Text("Add a widget to make this space your own.", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(16.dp))
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
             items(widgets, key = { it.widgetId }) { widget ->
-                val info = manager.getAppWidgetInfo(widget.widgetId)
+                val info = if (widget.widgetId >= 0) manager.getAppWidgetInfo(widget.widgetId) else null
+                val missingProvider = if (widget.widgetId < 0) manager.installedProviders.firstOrNull { it.provider.flattenToString() == widget.providerName } else null
                 Column {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(info?.loadLabel(context.packageManager)?.toString() ?: "Unavailable widget", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        Text(info?.loadLabel(context.packageManager)?.toString() ?: missingProvider?.loadLabel(context.packageManager)?.toString() ?: widget.providerName ?: "Unavailable widget", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                         TextButton(onClick = { onRemove(widget) }) { Text("Remove") }
                     }
                     if (info == null) {
-                        Text("The provider is unavailable. Remove this widget or enable its app.", style = MaterialTheme.typography.bodySmall)
+                        Text(if (missingProvider != null) "Restore this widget to grant binding permission and configure it again." else "The provider is unavailable. Remove this widget or install/enable its app.", style = MaterialTheme.typography.bodySmall)
+                        if (missingProvider != null) TextButton(onClick = { onRebind(widget, missingProvider) }) { Text("Restore widget") }
                     } else {
                         val density = LocalDensity.current.density
                         AndroidView(

@@ -37,7 +37,8 @@ class LauncherViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     val widgets = widgetDao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    fun putWidget(id: Int, height: Int) { viewModelScope.launch { widgetDao.put(WidgetPlacement(id, height.coerceIn(100, 600))) } }
+    fun putWidget(id: Int, height: Int, provider: String? = null) { viewModelScope.launch { widgetDao.put(WidgetPlacement(id, height.coerceIn(100, 600), provider)) } }
+    fun replaceWidget(placeholderId: Int, id: Int, height: Int, provider: String?) { viewModelScope.launch { widgetDao.replacePlaceholder(placeholderId, WidgetPlacement(id, height.coerceIn(100, 600), provider)) } }
     fun removeWidget(id: Int) { viewModelScope.launch { widgetDao.delete(id) } }
     val suggestions = repository.suggestedApps.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     fun refreshSuggestions() = repository.refreshSuggestions()

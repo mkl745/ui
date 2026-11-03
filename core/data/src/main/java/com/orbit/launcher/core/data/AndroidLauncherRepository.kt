@@ -429,6 +429,10 @@ object DatabaseModule {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `customIconUri` TEXT")
                 }
+            }, object : Migration(5, 6) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `widgets` ADD COLUMN `providerName` TEXT")
+                }
             }).build()
     @Provides fun preferences(database: LauncherDatabase): AppPreferenceDao = database.preferences()
     @Provides fun widgets(database: LauncherDatabase): WidgetDao = database.widgets()

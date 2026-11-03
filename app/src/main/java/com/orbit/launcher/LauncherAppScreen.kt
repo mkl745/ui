@@ -83,14 +83,20 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     }
     val widgetManager = remember { AppWidgetManager.getInstance(context) }
     var pendingWidgetId by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
+    var pendingPlaceholder by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
+    var pendingWidgetHeight by rememberSaveable { mutableIntStateOf(180) }
     fun cancelPendingWidget() {
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) widgetHost.deleteAppWidgetId(pendingWidgetId)
         pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+        pendingPlaceholder = AppWidgetManager.INVALID_APPWIDGET_ID
     }
     fun savePendingWidget() {
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            viewModel.putWidget(pendingWidgetId, 180)
+            val provider = widgetManager.getAppWidgetInfo(pendingWidgetId)?.provider?.flattenToString()
+            if (pendingPlaceholder < AppWidgetManager.INVALID_APPWIDGET_ID) viewModel.replaceWidget(pendingPlaceholder, pendingWidgetId, pendingWidgetHeight, provider)
+            else viewModel.putWidget(pendingWidgetId, pendingWidgetHeight, provider)
             pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+            pendingPlaceholder = AppWidgetManager.INVALID_APPWIDGET_ID
         }
     }
     val configureWidget = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -112,8 +118,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val bindWidget = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) configureOrSaveWidget() else cancelPendingWidget()
     }
-    fun addWidget(provider: AppWidgetProviderInfo) {
+    fun addWidget(provider: AppWidgetProviderInfo, placeholder: com.orbit.launcher.core.data.WidgetPlacement? = null) {
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) return
+        pendingPlaceholder = placeholder?.widgetId ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        pendingWidgetHeight = placeholder?.heightDp ?: 180
         pendingWidgetId = widgetHost.allocateAppWidgetId()
         try {
             if (widgetManager.bindAppWidgetIdIfAllowed(pendingWidgetId, provider.provider)) configureOrSaveWidget()
@@ -216,9 +224,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 if (!viewModel.launchShortcut(shortcut.app, shortcut.id)) Toast.makeText(context, "Shortcut unavailable", Toast.LENGTH_SHORT).show()
             }, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "groups" -> GroupsScreen(apps, settings, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
-            "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
-                { widget, height -> viewModel.putWidget(widget.widgetId, height) },
-                { widget -> viewModel.removeWidget(widget.widgetId); widgetHost.deleteAppWidgetId(widget.widgetId) },
+            "widgets" -> WidgetScreen(widgetHost, widgets, { addWidget(it) },
+                { widget, height -> viewModel.putWidget(widget.widgetId, height, widget.providerName) },
+                { widget -> viewModel.removeWidget(widget.widgetId); if (widget.widgetId >= 0) widgetHost.deleteAppWidgetId(widget.widgetId) },
+                { widget, provider -> addWidget(provider, widget) },
                 { screen = "home" })
             "settings" -> SettingsScreen(settings, apps, packs, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly,
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; export.launch("orbit-backup.json") } else export.launch("orbit-backup.json") },
