@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -72,7 +73,10 @@ fun OrbitHome(
         apps.filterNot { it.hidden || it.searchOnly }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
             .thenBy { ranks[it.key] ?: Int.MAX_VALUE }.thenByDescending { it.launches }.thenByDescending { it.lastLaunched }.thenBy { it.label.lowercase() }).take(16)
     }
-    val rotation = remember { Animatable(0f) }
+    val innerRotation = remember { Animatable(0f) }
+    val outerRotation = remember { Animatable(0f) }
+    var selectedRing by remember { mutableIntStateOf(0) }
+    val rotation = if (selectedRing == 0) innerRotation else outerRotation
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
@@ -80,7 +84,7 @@ fun OrbitHome(
     LaunchedEffect(settings.wallpaperEnabled, settings.wallpaperParallax, settings.reduceMotion) {
         if (settings.wallpaperEnabled && settings.wallpaperParallax && !settings.reduceMotion) {
             var lastUpdate = 0L
-            snapshotFlow { rotation.value }.collect { angle ->
+            snapshotFlow { innerRotation.value + outerRotation.value }.collect { angle ->
                 val now = android.os.SystemClock.uptimeMillis()
                 if (now - lastUpdate >= 50) {
                     lastUpdate = now
@@ -115,16 +119,23 @@ fun OrbitHome(
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
                         twoFingerActive = false
+                        var initialDistance = 0f
+                        var switchedRing = false
                         do {
                             val event = awaitPointerEvent()
-                            if (!twoFingerActive && event.changes.count { it.pressed } >= 2) {
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.size >= 2) {
                                 twoFingerActive = true
-                                latestGesture(settings.twoFinger)
+                                val distance = (pressed[0].position - pressed[1].position).getDistance()
+                                if (initialDistance == 0f) initialDistance = distance
+                                else if (initialDistance > 0f && distance / initialDistance > 1.25f) { selectedRing = 1; switchedRing = true }
+                                else if (initialDistance > 0f && distance / initialDistance < .8f) { selectedRing = 0; switchedRing = true }
                             }
                         } while (event.changes.any { it.pressed })
+                        if (twoFingerActive && !switchedRing) latestGesture(settings.twoFinger)
                     }
                 }
-                .pointerInput(settings.reduceMotion, settings.swipeUp, settings.swipeDown, settings.swipeLeft, settings.swipeRight) {
+                .pointerInput(selectedRing, settings.reduceMotion, settings.swipeUp, settings.swipeDown, settings.swipeLeft, settings.swipeRight) {
                     val tracker = VelocityTracker()
                     var dragX = 0f
                     var dragY = 0f
@@ -142,6 +153,11 @@ fun OrbitHome(
                             }
                             if (!settings.reduceMotion) scope.launch {
                                 rotation.animateDecay(velocity.coerceIn(-720f, 720f), exponentialDecay(frictionMultiplier = 2.5f))
+                                val slots = if (selectedRing == 0) minOf(6, orbitApps.size) else minOf(10, (orbitApps.size - 6).coerceAtLeast(0))
+                                if (slots > 0) {
+                                    val step = 360f / slots
+                                    rotation.animateTo((rotation.value / step).roundToInt() * step, spring())
+                                }
                             }
                         },
                         onDrag = { change, drag ->
@@ -158,19 +174,21 @@ fun OrbitHome(
             val ringColor = MaterialTheme.colorScheme.primary
             OrbitGlow(Modifier.fillMaxSize(), ringColor, settings.reduceMotion)
             Canvas(Modifier.fillMaxSize()) {
-                listOf(.22f, .36f, .46f).forEach { r ->
-                    drawCircle(ringColor.copy(alpha = .18f), radius = size.minDimension * r, style = Stroke(1.dp.toPx()))
+                listOf(.22f, .36f, .46f).forEachIndexed { index, r ->
+                    val selected = (selectedRing == 0 && index == 0) || (selectedRing == 1 && index == 2)
+                    drawCircle(ringColor.copy(alpha = if (selected) .38f else .14f), radius = size.minDimension * r, style = Stroke(1.dp.toPx()))
                 }
                 drawCircle(ringColor.copy(alpha = .035f), radius = size.minDimension * .16f)
             }
             val dimension = minOf(maxWidth, maxHeight)
-            val radians = rotation.value * PI / 180.0
+            val innerRadians = innerRotation.value * PI / 180.0
+            val outerRadians = outerRotation.value * PI / 180.0
             orbitApps.forEachIndexed { index, app ->
                 key(app.key) {
                     val inner = index < 6
                     val slot = if (inner) index else index - 6
                     val count = if (inner) minOf(6, orbitApps.size) else minOf(10, orbitApps.size - 6)
-                    val angle = -PI / 2 + (2 * PI * slot / count.coerceAtLeast(1)) + if (inner) radians else -radians * .7
+                    val angle = -PI / 2 + (2 * PI * slot / count.coerceAtLeast(1)) + if (inner) innerRadians else outerRadians
                     val radius = dimension * if (inner) .22f else .40f
                     val x = radius * cos(angle).toFloat()
                     val y = radius * sin(angle).toFloat()
@@ -187,7 +205,7 @@ fun OrbitHome(
             ) { Text("⌕", fontSize = 34.sp, color = MaterialTheme.colorScheme.onPrimary) }
         }
         Spacer(Modifier.weight(1f))
-        Text("DRAG TO ROTATE  ·  TAP THE CENTER TO SEARCH", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
+        Text("DRAG TO ROTATE  ·  PINCH TO SWITCH RINGS", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
         TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 8.dp)) { Text("ALL APPS  ↗") }
     }
     }
