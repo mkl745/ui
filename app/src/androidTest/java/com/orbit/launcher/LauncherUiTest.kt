@@ -15,7 +15,6 @@ import com.orbit.launcher.core.ui.OrbitTheme
 import com.orbit.launcher.feature.home.LauncherFoundationScreen
 import com.orbit.launcher.feature.home.OrbitHome
 import com.orbit.launcher.feature.search.SearchScreen
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,10 +22,15 @@ class LauncherUiTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun setupCanBeSkipped() {
-        var skipped = false
-        compose.setContent { OrbitTheme { LauncherFoundationScreen(false, 0, onChooseDefault = {}, onContinue = { skipped = true }) } }
+        var skipped by mutableStateOf(false)
+        compose.setContent {
+            OrbitTheme {
+                if (skipped) androidx.compose.material3.Text("Launcher ready")
+                else LauncherFoundationScreen(false, 0, onChooseDefault = {}, onContinue = { skipped = true })
+            }
+        }
         compose.onNodeWithText("Continue without changing").performClick()
-        compose.runOnIdle { assertTrue(skipped) }
+        compose.onNodeWithText("Launcher ready").assertIsDisplayed()
     }
 
     @Test fun hubOpensSearchAndFindsApp() {
