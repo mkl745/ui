@@ -8,6 +8,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -90,17 +92,19 @@ fun OrbitHome(
     DisposableEffect(wallpaper) { onDispose { try { wallpaper.setWallpaperOffsets(view.windowToken, .5f, .5f) } catch (_: RuntimeException) { } } }
     val latestGesture by rememberUpdatedState(onGesture)
     var twoFingerActive by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(if (settings.wallpaperEnabled) { if (MaterialTheme.colorScheme.background.luminance() > .5f) Color.White.copy(alpha = .75f) else Color.Black.copy(alpha = .48f) } else MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(if (settings.wallpaperEnabled) { if (MaterialTheme.colorScheme.background.luminance() > .5f) Color.White.copy(alpha = .75f) else Color.Black.copy(alpha = .48f) } else MaterialTheme.colorScheme.background).safeDrawingPadding()) {
+    val orbitHeight = (maxHeight - 150.dp).coerceIn(120.dp, 480.dp)
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text("O R B I T", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                 Text("YOUR SPACE", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, letterSpacing = 2.sp)
             }
-            Row { TextButton(onClick = onGroups) { Text("Groups") }; TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
+            Row(Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState())) { TextButton(onClick = onGroups) { Text("Groups") }; TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
         }
         Spacer(Modifier.weight(1f))
         BoxWithConstraints(
-            Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 480.dp).aspectRatio(1f)
+            Modifier.fillMaxWidth().heightIn(min = 120.dp, max = orbitHeight).aspectRatio(1f)
                 .pointerInput(settings.doubleTap, settings.emptyLongPress) {
                     detectTapGestures(onDoubleTap = { latestGesture(settings.doubleTap) }, onLongPress = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -184,7 +188,8 @@ fun OrbitHome(
         }
         Spacer(Modifier.weight(1f))
         Text("DRAG TO ROTATE  ·  TAP THE CENTER TO SEARCH", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
-        TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 16.dp)) { Text("ALL APPS  ↗") }
+        TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 8.dp)) { Text("ALL APPS  ↗") }
+    }
     }
 }
 
