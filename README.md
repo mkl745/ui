@@ -1,25 +1,25 @@
 # Orbit Launcher
 
-Orbit is an Android launcher under construction. Its planned interaction model is a set of concentric, physics-driven app orbits around a central search hub. This repository currently contains **step 1 only**: the build and module foundation, a single-activity Compose entry point, and the default-home onboarding flow. It does **not** yet list or launch apps. Do not rely on this early build as your only launcher; you can change the default home app in Android settings.
+Orbit is an **early-stage**, single-activity Android launcher experiment. It is not yet a production launcher or a replacement for a fully featured home app. The implemented interface uses a rotating pair of app rings around a search hub. Drag horizontally to rotate; fling to continue moving; swipe up or tap the hub to search; long-press an app for actions. A physical keyboard starts an app search from home.
 
-## Build
+## Build and verification
 
-Prerequisites: JDK 17, Android SDK Platform 35, and Android SDK Build Tools 35.0.0 (install these using Android Studio's SDK Manager). Open the project in a current Android Studio release, or configure `ANDROID_HOME` / `local.properties` and run:
+Prerequisites: JDK 17 and Android SDK Platform / Build Tools 35. In Android Studio, open this directory, or configure `ANDROID_HOME` / `local.properties` and run `./gradlew :app:assembleDebug :core:domain:test`. The GitHub Actions workflow performs the same build and unit tests on each push and uploads a debug APK on success. Release builds have shrinking enabled; configure your own signing credentials outside the repository.
 
-```sh
-./gradlew :app:assembleDebug
-```
+The first-run screen offers the Android home role (Android 10+) or system home settings (Android 8–9). Skipping the prompt does not change the default. Keep another launcher installed and know how to restore it in system settings before trying this build. HOME intents return to the home screen.
 
-Install `app/build/outputs/apk/debug/app-debug.apk` on an Android 8.0+ device or emulator. The app's first screen explains the current limitations before offering the default-home role. On Android 10+ this uses `RoleManager`; on older devices it opens system home settings. Skipping the prompt does not change the default. Pressing Home sends a new HOME intent to the existing activity and resets the onboarding view; later steps will extend this to reset navigation and transient UI state.
+## Implemented so far
+
+- Profile-aware discovery and launching through `LauncherApps`, package callbacks, and platform-badged icons with an in-memory LRU bitmap cache. Long-press offers available app shortcuts, app info/uninstall for the current profile, rename, pin and hide. Hidden apps can be restored in settings.
+- Room stores per-component/profile pinning, visibility, label and launcher-recorded launch counts; DataStore stores icon size, label visibility and reduced-motion preference. Ranking is currently pinned-first, followed by launch count and recency. These counts are Orbit's own, not Android usage statistics.
+- Fuzzy app search and a scrollable app list. A notification listener, enabled explicitly in system settings, displays current-profile notification counts without storing notification contents. Work-profile notification counts are intentionally not attributed.
+- A JSON export/import via the Storage Access Framework for these app preferences and settings. Restore replaces all existing Orbit app preferences. The file includes launcher-recorded usage history and profile serials; serials may differ on another device, so per-app settings may not match after migration. JSON is size-limited and validated before writes, but Room and DataStore writes are separate and are not atomic together.
+- Settings include a live icon preview, label and icon-size controls, reduced motion, notification access and hidden-app management. No network permission, analytics or ads are included.
+
+## Not yet implemented
+
+This is a partial implementation of the requested launcher. It does not yet have widgets, folders, biometric locking, search-only apps, disk icon caching, icon packs, themed icons or configurable masks. Search covers apps only; contacts, files, calculator, conversions and web are not implemented. Contextual suggestions, system usage-stat permission, wallpaper/parallax, dynamic/manual theming, AGSL effects, full gesture configuration, two-finger gestures and the complete requested animation system are also absent. Accessibility, localization/RTL, large-screen layouts, predictive back, automated UI coverage, macrobenchmarks, baseline profiles, lint/ktlint/detekt, and performance targets still require dedicated work and device testing. The current reduced-motion setting disables fling, not every animation. Do not assume production readiness or any specific performance threshold.
 
 ## Modules
 
-- `:app` — application, Hilt root, activity, launcher intent filters and system role integration.
-- `:core:domain` — platform-independent domain models and use cases (added in subsequent steps).
-- `:core:data` — Android data implementations, Room, DataStore and Hilt dependencies.
-- `:core:ui` — shared Compose theme and UI primitives.
-- `:feature:home`, `:feature:drawer`, `:feature:search`, `:feature:settings` — feature boundaries. The home feature currently supplies the setup/foundation screen; the others are empty modules until their respective steps.
-
-The version catalog centralizes dependency and plugin versions; feature modules depend on domain/UI, while the app composes features and data. Room and DataStore are wired as dependencies, not yet implemented. The manifest declares no network or runtime permissions. Android system backup is disabled until the explicit, user-controlled backup/restore implementation is added. The release build enables R8 and resource shrinking; signing is intentionally left to the developer's local configuration.
-
-The visual identity in the initial screen is a static Canvas motif, not the interactive launcher. Motion, shaders, app discovery, gestures, widgets, search, persistence, permissions, accessibility refinements, tests, and performance targets will be implemented and measured in later steps. No cold-start or frame-rate target is asserted at this stage.
+`:app` owns the activity, Hilt root, notification service and integration; `:core:domain` contains models and search ranking; `:core:data` contains LauncherApps, Room, DataStore, and backup; `:core:ui` holds the base theme. `:feature:home`, `:feature:search`, and `:feature:settings` hold Compose UI. `:feature:drawer` remains an empty boundary because app access is currently provided by search rather than a grid drawer.

@@ -1,6 +1,8 @@
 package com.orbit.launcher.feature.settings
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.*
+import com.orbit.launcher.feature.home.AppOrb
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -12,13 +14,20 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, onUnhide: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(8.dp))
         Text("Changes apply immediately.", color = MaterialTheme.colorScheme.secondary)
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
+        apps.firstOrNull { !it.hidden }?.let { previewApp ->
+            Text("LIVE PREVIEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                AppOrb(previewApp, settings, 0, loadIcon, {}, {})
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) { Text("App labels"); Text("Show names around the orbit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
             Switch(settings.showLabels, { onChange(settings.copy(showLabels = it)) })

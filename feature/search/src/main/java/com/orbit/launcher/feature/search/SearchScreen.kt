@@ -22,8 +22,8 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.searchApps
 
 @Composable
-fun SearchScreen(apps: List<LauncherApp>, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
-    var query by remember { mutableStateOf("") }
+fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
+    var query by remember { mutableStateOf(initialQuery) }
     val requester = remember { FocusRequester() }
     val results = remember(apps, query) { searchApps(apps.filterNot { it.hidden }, query) }
     LaunchedEffect(Unit) { requester.requestFocus() }

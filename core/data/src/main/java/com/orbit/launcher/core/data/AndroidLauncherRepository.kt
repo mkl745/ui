@@ -80,11 +80,11 @@ class AndroidLauncherRepository @Inject constructor(
     private val discovered = callbackFlow {
         fun refresh() { trySend(Unit) }
         val callback = object : LauncherApps.Callback() {
-            override fun onPackageAdded(packageName: String, user: UserHandle) = refresh()
-            override fun onPackageRemoved(packageName: String, user: UserHandle) = refresh()
+            override fun onPackageAdded(packageName: String, user: UserHandle) { iconCache.evictAll(); refresh() }
+            override fun onPackageRemoved(packageName: String, user: UserHandle) { iconCache.evictAll(); refresh() }
             override fun onPackageChanged(packageName: String, user: UserHandle) { iconCache.evictAll(); refresh() }
-            override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = refresh()
-            override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = refresh()
+            override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) { iconCache.evictAll(); refresh() }
+            override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) { iconCache.evictAll(); refresh() }
         }
         launcher.registerCallback(callback, Handler(Looper.getMainLooper()))
         refresh()

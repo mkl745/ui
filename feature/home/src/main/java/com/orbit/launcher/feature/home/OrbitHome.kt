@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +60,7 @@ fun OrbitHome(
     }
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     Column(Modifier.fillMaxSize().background(Color(0xFF090C15)).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
@@ -70,18 +74,23 @@ fun OrbitHome(
             Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 480.dp).aspectRatio(1f)
                 .pointerInput(settings.reduceMotion) {
                     val tracker = VelocityTracker()
+                    var dragX = 0f
+                    var dragY = 0f
                     detectDragGestures(
-                        onDragStart = { tracker.resetTracking(); scope.launch { rotation.stop() } },
+                        onDragStart = { tracker.resetTracking(); dragX = 0f; dragY = 0f; scope.launch { rotation.stop() } },
                         onDragEnd = {
                             val velocity = tracker.calculateVelocity().x / size.width.coerceAtLeast(1) * 360f
+                            if (dragY < -size.height * .16f && kotlin.math.abs(dragY) > kotlin.math.abs(dragX)) { onSearch(); return@detectDragGestures }
                             if (!settings.reduceMotion) scope.launch {
                                 rotation.animateDecay(velocity.coerceIn(-720f, 720f), exponentialDecay(frictionMultiplier = 2.5f))
                             }
                         },
                         onDrag = { change, drag ->
+                            dragX += drag.x
+                            dragY += drag.y
                             tracker.addPosition(change.uptimeMillis, change.position)
                             change.consume()
-                            scope.launch { rotation.snapTo(rotation.value + drag.x / size.width * 240f) }
+                            if (kotlin.math.abs(dragX) >= kotlin.math.abs(dragY)) scope.launch { rotation.snapTo(rotation.value + drag.x / size.width * 240f) }
                         },
                     )
                 },
@@ -106,7 +115,7 @@ fun OrbitHome(
                     val x = radius * cos(angle).toFloat()
                     val y = radius * sin(angle).toFloat()
                     Box(Modifier.offset(x = x, y = y)) {
-                        AppOrb(app, settings, if (app.isWorkProfile) 0 else badgeCounts[app.packageName] ?: 0, loadIcon, onLaunch, onMenu)
+                        AppOrb(app, settings, if (app.isWorkProfile) 0 else badgeCounts[app.packageName] ?: 0, loadIcon, onLaunch) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onMenu(it) }
                     }
                 }
             }
@@ -118,7 +127,7 @@ fun OrbitHome(
             ) { Text("⌕", fontSize = 34.sp, color = Color(0xFF182553)) }
         }
         Spacer(Modifier.weight(1f))
-        Text("DRAG TO ROTATE  ·  TAP THE CENTER TO SEARCH", color = Color(0xFF78839F), fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
+        Text("DRAG TO ROTATE  ·  SWIPE UP OR TAP TO SEARCH", color = Color(0xFF78839F), fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
         TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 16.dp)) { Text("ALL APPS  ↗") }
     }
 }

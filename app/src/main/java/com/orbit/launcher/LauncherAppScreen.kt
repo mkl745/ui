@@ -15,6 +15,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.feature.home.OrbitHome
@@ -27,6 +31,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     val settings by viewModel.settings.collectAsState()
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
+    var initialQuery by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -48,14 +53,21 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     BackHandler(enabled = screen != "home" || selected != null) {
         if (selected != null) { selected = null; renaming = false } else screen = "home"
     }
-    Surface(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Surface(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onPreviewKeyEvent { event ->
+        val codepoint = event.nativeKeyEvent.unicodeChar
+        if (screen == "home" && selected == null && event.type == KeyEventType.KeyDown && codepoint > 0 && !Character.isISOControl(codepoint)) {
+            initialQuery = String(Character.toChars(codepoint))
+            screen = "search"
+            true
+        } else false
+    }) {
         when (screen) {
-            "search" -> SearchScreen(apps, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
-            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
+            "search" -> SearchScreen(apps, initialQuery, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
+            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
             }, { screen = "home" })
-            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { screen = "search" }, { screen = "settings" })
+            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" })
         }
     }
     selected?.let { app ->
