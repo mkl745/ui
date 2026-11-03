@@ -1,6 +1,12 @@
 package com.orbit.launcher.core.data
 
 import android.content.ComponentName
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import androidx.core.content.ContextCompat
+import java.util.Locale
 import android.content.Context
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
@@ -94,6 +100,9 @@ private val ICON_PACK = stringPreferencesKey("icon_pack")
 private val WALLPAPER_ENABLED = booleanPreferencesKey("wallpaper_enabled")
 private val WALLPAPER_PARALLAX = booleanPreferencesKey("wallpaper_parallax")
 private val BLUR_STRENGTH = intPreferencesKey("blur_strength")
+private val LOCATION_CATEGORIES = booleanPreferencesKey("location_categories")
+private val HOME_ANCHOR = stringPreferencesKey("home_anchor")
+private val WORK_ANCHOR = stringPreferencesKey("work_anchor")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock", "torch")
 private fun validGesture(value: String) = value in gestureActions || (value.startsWith("app:") && value.length in 5..1028)
 
@@ -194,13 +203,17 @@ class AndroidLauncherRepository @Inject constructor(
             iconPack = it[ICON_PACK] ?: "",
             wallpaperEnabled = it[WALLPAPER_ENABLED] ?: false, wallpaperParallax = it[WALLPAPER_PARALLAX] ?: false,
             blurStrength = (it[BLUR_STRENGTH] ?: 20).coerceIn(0, 40),
+            locationCategories = it[LOCATION_CATEGORIES] ?: false,
+            homeAnchor = it[HOME_ANCHOR] ?: "", workAnchor = it[WORK_ANCHOR] ?: "",
         )
     }
 
     override suspend fun updateSettings(settings: LauncherSettings) {
         var clearHistory = false
+        var clearLocations = false
         context.launcherSettings.edit {
             clearHistory = it[CONTEXT_SUGGESTIONS] == true && !settings.contextSuggestions
+            clearLocations = it[LOCATION_CATEGORIES] == true && !settings.locationCategories
             it[SHOW_LABELS] = settings.showLabels
             it[REDUCE_MOTION] = settings.reduceMotion
             it[ICON_SIZE] = settings.iconSize.coerceIn(32, 72)
@@ -227,14 +240,60 @@ class AndroidLauncherRepository @Inject constructor(
             it[WALLPAPER_ENABLED] = settings.wallpaperEnabled
             it[WALLPAPER_PARALLAX] = settings.wallpaperParallax
             it[BLUR_STRENGTH] = settings.blurStrength.coerceIn(0, 40)
+            it[LOCATION_CATEGORIES] = settings.locationCategories
+            if (!settings.locationCategories) { it.remove(HOME_ANCHOR); it.remove(WORK_ANCHOR) }
         }
-        if (clearHistory) usageDao.clear()
+        if (clearHistory) usageDao.clear() else if (clearLocations) usageDao.clearLocations()
     }
 
     private val suggestionRefresh = MutableStateFlow(0L)
     override fun refreshSuggestions() { suggestionRefresh.value = System.currentTimeMillis() }
 
-    private fun currentContext(): CurrentContext {
+    private fun lastCoarseLocation(): Location? {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return null
+        val manager = context.getSystemService(LocationManager::class.java)
+        return try {
+            val now = android.os.SystemClock.elapsedRealtimeNanos()
+            manager.getProviders(true).mapNotNull { provider ->
+                try { manager.getLastKnownLocation(provider) } catch (_: SecurityException) { null } catch (_: IllegalArgumentException) { null }
+            }.filter { (now - it.elapsedRealtimeNanos) in 0..21_600_000_000_000L }
+                .maxByOrNull { it.elapsedRealtimeNanos }
+        } catch (_: SecurityException) { null }
+    }
+
+    /** Stores only rounded coordinates when the user explicitly marks a place. */
+    suspend fun setLocationAnchor(place: String): Boolean = withContext(Dispatchers.IO) {
+        if (place !in setOf("home", "work") || !settings.first().locationCategories) return@withContext false
+        val location = lastCoarseLocation() ?: return@withContext false
+        val rounded = String.format(Locale.ROOT, "%.2f,%.2f", location.latitude, location.longitude)
+        context.launcherSettings.edit { it[if (place == "home") HOME_ANCHOR else WORK_ANCHOR] = rounded }
+        refreshSuggestions()
+        true
+    }
+
+    private fun locationCategory(prefs: LauncherSettings): String? {
+        if (!prefs.locationCategories) return null
+        val location = lastCoarseLocation() ?: return null
+        fun distance(anchor: String): Float? {
+            val parts = anchor.split(',')
+            if (parts.size != 2) return null
+            val lat = parts[0].toDoubleOrNull() ?: return null
+            val lon = parts[1].toDoubleOrNull() ?: return null
+            val result = FloatArray(1)
+            Location.distanceBetween(location.latitude, location.longitude, lat, lon, result)
+            return result[0]
+        }
+        val home = distance(prefs.homeAnchor)
+        val work = distance(prefs.workAnchor)
+        return when {
+            home == null && work == null -> null
+            home != null && home < 2000 && (work == null || home <= work) -> "home"
+            work != null && work < 2000 -> "work"
+            else -> "other"
+        }
+    }
+
+    private fun currentContext(prefs: LauncherSettings): CurrentContext {
         val now = Calendar.getInstance()
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val status = battery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
@@ -243,7 +302,7 @@ class AndroidLauncherRepository @Inject constructor(
         val headphones = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
             it.type in setOf(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_USB_HEADSET)
         }
-        return CurrentContext(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.DAY_OF_WEEK), charging, headphones)
+        return CurrentContext(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.DAY_OF_WEEK), charging, headphones, locationCategory(prefs))
     }
 
     private fun systemUsage(apps: List<LauncherApp>): List<UsageContext> {
@@ -272,12 +331,12 @@ class AndroidLauncherRepository @Inject constructor(
         } catch (_: SecurityException) { emptyList() }
     }
 
-    override val suggestedApps: Flow<List<LauncherApp>> = combine(apps, usageDao.observeRecent(), settings.map { it.contextSuggestions }.distinctUntilChanged(), suggestionRefresh) { appList, entries, enabled, _ ->
-        Triple(appList, entries, enabled)
-    }.map { (appList, entries, enabled) ->
-        if (!enabled) emptyList() else {
-            val local = entries.map { UsageContext(it.appKey, it.hour, it.weekday, it.charging, it.headphones, it.timestamp) }
-            rankContextApps(appList, local + systemUsage(appList), currentContext(), System.currentTimeMillis()).take(6)
+    override val suggestedApps: Flow<List<LauncherApp>> = combine(apps, usageDao.observeRecent(), settings.map { Triple(it.contextSuggestions, it.locationCategories, it.homeAnchor to it.workAnchor) }.distinctUntilChanged(), suggestionRefresh) { appList, entries, selected, _ ->
+        Triple(appList, entries, selected)
+    }.map { (appList, entries, selected) ->
+        if (!selected.first) emptyList() else {
+            val local = entries.map { UsageContext(it.appKey, it.hour, it.weekday, it.charging, it.headphones, it.timestamp, it.locationCategory) }
+            rankContextApps(appList, local + systemUsage(appList), currentContext(settings.first()), System.currentTimeMillis()).take(6)
         }
     }.flowOn(Dispatchers.IO)
 
@@ -299,9 +358,10 @@ class AndroidLauncherRepository @Inject constructor(
             launcher.startMainActivity(component, profile, null, null)
             val now = System.currentTimeMillis()
             update(app) { it.copy(launches = it.launches + 1, lastLaunched = now) }
-            if (settings.first().contextSuggestions) {
-                val signal = withContext(Dispatchers.IO) { currentContext() }
-                usageDao.insert(UsageContextEntity(appKey = app.key, hour = signal.hour, weekday = signal.weekday, charging = signal.charging, headphones = signal.headphones, timestamp = now))
+            val prefs = settings.first()
+            if (prefs.contextSuggestions) {
+                val signal = withContext(Dispatchers.IO) { currentContext(prefs) }
+                usageDao.insert(UsageContextEntity(appKey = app.key, hour = signal.hour, weekday = signal.weekday, charging = signal.charging, headphones = signal.headphones, timestamp = now, locationCategory = signal.locationCategory))
                 usageDao.prune()
             }
             true

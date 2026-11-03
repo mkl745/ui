@@ -17,7 +17,7 @@ import com.orbit.launcher.core.domain.IconPack
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPacks: List<IconPack>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onChooseFolder: () -> Unit, onClearFolder: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPacks: List<IconPack>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onChooseFolder: () -> Unit, onClearFolder: () -> Unit, onLocationChange: (Boolean) -> Unit, onCaptureLocation: (String) -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -109,6 +109,20 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPack
         if (settings.contextSuggestions) {
             Text("Optionally include device usage events by granting usage access in system settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
             TextButton(onClick = onUsageAccess) { Text("Manage usage access") }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text("Location categories")
+                    Text("Optionally use a recent coarse location to learn home, work or other. Coordinates stay on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                }
+                Switch(settings.locationCategories, onLocationChange)
+            }
+            if (settings.locationCategories) {
+                Text("Mark places using the device's recent location (up to 6 hours old). Disabling this deletes saved places and location labels.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                Row {
+                    TextButton(onClick = { onCaptureLocation("home") }) { Text(if (settings.homeAnchor.isEmpty()) "Mark home" else "Update home") }
+                    TextButton(onClick = { onCaptureLocation("work") }) { Text(if (settings.workAnchor.isEmpty()) "Mark work" else "Update work") }
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         Text("Gestures", style = MaterialTheme.typography.titleMedium)

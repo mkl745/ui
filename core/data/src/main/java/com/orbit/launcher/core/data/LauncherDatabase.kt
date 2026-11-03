@@ -95,6 +95,7 @@ data class UsageContextEntity(
     val charging: Boolean,
     val headphones: Boolean,
     val timestamp: Long,
+    val locationCategory: String? = null,
 )
 
 @Dao
@@ -105,9 +106,10 @@ interface UsageContextDao {
     @Query("DELETE FROM usage_context WHERE id NOT IN (SELECT id FROM usage_context ORDER BY id DESC LIMIT 1000)")
     suspend fun prune()
     @Query("DELETE FROM usage_context") suspend fun clear()
+    @Query("UPDATE usage_context SET locationCategory = NULL") suspend fun clearLocations()
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 6, exportSchema = false)
+@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 7, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao

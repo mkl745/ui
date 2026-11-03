@@ -32,5 +32,10 @@ object LauncherMigrations {
                 db.execSQL("ALTER TABLE `widgets` ADD COLUMN `providerName` TEXT")
             }
         },
+        object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `usage_context` ADD COLUMN `locationCategory` TEXT")
+            }
+        },
     )
 }

@@ -52,6 +52,9 @@ data class LauncherSettings(
     val wallpaperEnabled: Boolean = false,
     val wallpaperParallax: Boolean = false,
     val blurStrength: Int = 20,
+    val locationCategories: Boolean = false,
+    val homeAnchor: String = "",
+    val workAnchor: String = "",
 )
 
 interface LauncherRepository {

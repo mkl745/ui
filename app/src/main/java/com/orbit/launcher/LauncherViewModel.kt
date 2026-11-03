@@ -69,6 +69,7 @@ class LauncherViewModel @Inject constructor(
             } ?: emptyList()
         } catch (_: SecurityException) { emptyList() } catch (_: IllegalArgumentException) { emptyList() }
     }
+    suspend fun setLocationAnchor(place: String) = androidRepository.setLocationAnchor(place)
     suspend fun installedIconPacks() = androidRepository.installedIconPacks()
     suspend fun searchShortcuts(query: String) = androidRepository.searchShortcuts(query, apps.value)
     suspend fun documents(query: String): List<DocumentResult> = withContext(Dispatchers.IO) {

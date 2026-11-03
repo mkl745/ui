@@ -81,6 +81,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     var contactsRationale by remember { mutableStateOf(false) }
+    var locationRationale by remember { mutableStateOf(false) }
     var torchRationale by remember { mutableStateOf(false) }
     val torchStates = remember { mutableStateMapOf<String, Boolean>() }
     var pendingIconKey by rememberSaveable { mutableStateOf("") }
@@ -169,6 +170,9 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         } catch (_: SecurityException) {
             cancelPendingWidget(); Toast.makeText(context, "Widget binding denied", Toast.LENGTH_SHORT).show()
         }
+    }
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.settings(viewModel.settings.value.copy(locationCategories = granted))
     }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.settings(viewModel.settings.value.copy(contactSearch = granted))
@@ -303,6 +307,15 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 if (old.isNotBlank()) try { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) { }
                 viewModel.settings(settings.copy(documentTree = ""))
             }, { enabled ->
+                if (!enabled) viewModel.settings(settings.copy(locationCategories = false))
+                else if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) viewModel.settings(settings.copy(locationCategories = true))
+                else locationRationale = true
+            }, { place ->
+                scope.launch {
+                    val saved = viewModel.setLocationAnchor(place)
+                    Toast.makeText(context, if (saved) "Place saved on this device" else "No recent location; enable location and try again", Toast.LENGTH_LONG).show()
+                }
+            }, { enabled ->
                 if (!enabled) viewModel.settings(settings.copy(contactSearch = false))
                 else if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) viewModel.settings(settings.copy(contactSearch = true))
                 else contactsRationale = true
@@ -313,6 +326,13 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         }
         }
     }
+    if (locationRationale) AlertDialog(
+        onDismissRequest = { locationRationale = false },
+        title = { Text("Location categories") },
+        text = { Text("Orbit can use the device's recent approximate location to distinguish home, work and other places. Rounded places and category history stay on this device. Turn this off to delete them.") },
+        confirmButton = { TextButton(onClick = { locationRationale = false; locationPermission.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }) { Text("Continue") } },
+        dismissButton = { TextButton(onClick = { locationRationale = false }) { Text("Not now") } },
+    )
     if (torchRationale) AlertDialog(
         onDismissRequest = { torchRationale = false },
         title = { Text("Toggle the torch") },

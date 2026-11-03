@@ -2,8 +2,8 @@ package com.orbit.launcher.core.domain
 
 import kotlin.math.abs
 
-data class UsageContext(val appKey: String, val hour: Int, val weekday: Int, val charging: Boolean?, val headphones: Boolean?, val timestamp: Long)
-data class CurrentContext(val hour: Int, val weekday: Int, val charging: Boolean, val headphones: Boolean)
+data class UsageContext(val appKey: String, val hour: Int, val weekday: Int, val charging: Boolean?, val headphones: Boolean?, val timestamp: Long, val locationCategory: String? = null)
+data class CurrentContext(val hour: Int, val weekday: Int, val charging: Boolean, val headphones: Boolean, val locationCategory: String? = null)
 
 /** Scores only on-device signals. A missing device-state signal contributes no weight. */
 fun rankContextApps(apps: List<LauncherApp>, events: List<UsageContext>, context: CurrentContext, now: Long): List<LauncherApp> {
@@ -17,6 +17,7 @@ fun rankContextApps(apps: List<LauncherApp>, events: List<UsageContext>, context
         if (event.weekday == context.weekday) weight += 0.5
         if (event.charging != null && event.charging == context.charging) weight += 0.35
         if (event.headphones != null && event.headphones == context.headphones) weight += 0.35
+        if (event.locationCategory != null && event.locationCategory == context.locationCategory) weight += 0.6
         scores[event.appKey] = (scores[event.appKey] ?: 0.0) + weight / (1.0 + ageDays / 7.0)
     }
     return apps.filter { !it.hidden && !it.searchOnly && (scores[it.key] ?: 0.0) > 0.0 }
