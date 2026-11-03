@@ -15,6 +15,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +45,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var initialQuery by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
+    var grouping by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -102,10 +108,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             Toast.makeText(context, if (success) "Backup restored" else "Invalid or unreadable backup", Toast.LENGTH_LONG).show()
         }
     }
-    LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false }
+    LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false; grouping = false }
     LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus() }
     BackHandler(enabled = screen != "home" || selected != null) {
-        if (selected != null) { selected = null; renaming = false } else screen = "home"
+        if (selected != null) { selected = null; renaming = false; grouping = false } else screen = "home"
     }
     Surface(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onPreviewKeyEvent { event ->
         val codepoint = event.nativeKeyEvent.unicodeChar
@@ -117,19 +123,28 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     }.focusRequester(homeFocus).focusable()) {
         when (screen) {
             "search" -> SearchScreen(apps, initialQuery, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
+            "groups" -> GroupsScreen(apps, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
             "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
                 { widget, height -> viewModel.putWidget(widget.widgetId, height) },
                 { widget -> viewModel.removeWidget(widget.widgetId); widgetHost.deleteAppWidgetId(widget.widgetId) },
                 { screen = "home" })
-            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
+            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
             }, { screen = "home" })
-            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" })
+            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" })
         }
     }
     selected?.let { app ->
-        if (renaming) {
+        if (grouping) {
+            AlertDialog(
+                onDismissRequest = { grouping = false; selected = null },
+                title = { Text("Group ${app.label}") },
+                text = { OutlinedTextField(groupName, { groupName = it.take(60) }, label = { Text("Group name; blank removes") }, singleLine = true) },
+                confirmButton = { TextButton(onClick = { viewModel.group(app, groupName); grouping = false; selected = null }) { Text("Save") } },
+                dismissButton = { TextButton(onClick = { grouping = false; selected = null }) { Text("Cancel") } },
+            )
+        } else if (renaming) {
             AlertDialog(
                 onDismissRequest = { renaming = false; selected = null },
                 title = { Text("Rename ${app.label}") },
@@ -145,7 +160,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 onDismissRequest = { selected = null },
                 title = { Text(app.label) },
                 text = {
-                    androidx.compose.foundation.layout.Column {
+                    androidx.compose.foundation.layout.Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
                         shortcuts.take(5).forEach { shortcut ->
                             TextButton(onClick = {
                                 if (!viewModel.launchShortcut(app, shortcut.id)) Toast.makeText(context, "Shortcut unavailable", Toast.LENGTH_SHORT).show()
@@ -154,6 +169,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                         }
                         TextButton(onClick = { viewModel.pin(app); selected = null }) { Text(if (app.pinned) "Unpin from inner orbit" else "Pin to inner orbit") }
                         TextButton(onClick = { newName = app.label; renaming = true }) { Text("Rename") }
+                        TextButton(onClick = { groupName = app.groupName.orEmpty(); grouping = true }) { Text("Move to group") }
+                        TextButton(onClick = { viewModel.searchOnly(app); selected = null }) { Text(if (app.searchOnly) "Show in orbit" else "Search only") }
                         TextButton(onClick = { viewModel.hide(app); selected = null }) { Text("Hide app") }
                         if (!app.isWorkProfile) {
                             TextButton(onClick = {

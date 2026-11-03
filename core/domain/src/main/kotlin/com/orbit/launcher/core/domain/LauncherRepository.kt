@@ -13,6 +13,8 @@ data class LauncherApp(
     val hidden: Boolean = false,
     val launches: Int = 0,
     val lastLaunched: Long = 0,
+    val searchOnly: Boolean = false,
+    val groupName: String? = null,
 )
 
 data class LauncherSettings(
@@ -28,6 +30,8 @@ interface LauncherRepository {
     suspend fun setPinned(app: LauncherApp, pinned: Boolean)
     suspend fun setHidden(app: LauncherApp, hidden: Boolean)
     suspend fun setLabel(app: LauncherApp, label: String?)
+    suspend fun setSearchOnly(app: LauncherApp, searchOnly: Boolean)
+    suspend fun setGroup(app: LauncherApp, group: String?)
     suspend fun updateSettings(settings: LauncherSettings)
 }
 

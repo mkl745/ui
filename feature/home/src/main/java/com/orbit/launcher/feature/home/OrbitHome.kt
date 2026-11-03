@@ -54,9 +54,10 @@ fun OrbitHome(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
     onWidgets: () -> Unit,
+    onGroups: () -> Unit,
 ) {
     val orbitApps = remember(apps) {
-        apps.filterNot { it.hidden }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
+        apps.filterNot { it.hidden || it.searchOnly }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
             .thenByDescending { it.launches }.thenByDescending { it.lastLaunched }.thenBy { it.label.lowercase() }).take(16)
     }
     val rotation = remember { Animatable(0f) }
@@ -68,7 +69,7 @@ fun OrbitHome(
                 Text("O R B I T", color = Color(0xFFB7C7FF), fontSize = 12.sp)
                 Text("YOUR SPACE", color = Color(0xFF77819D), fontSize = 10.sp, letterSpacing = 2.sp)
             }
-            Row { TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
+            Row { TextButton(onClick = onGroups) { Text("Groups") }; TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
         }
         Spacer(Modifier.weight(1f))
         BoxWithConstraints(

@@ -32,6 +32,8 @@ class LauncherViewModel @Inject constructor(
     fun launch(app: LauncherApp) { viewModelScope.launch { repository.launch(app) } }
     fun pin(app: LauncherApp) { viewModelScope.launch { repository.setPinned(app, !app.pinned) } }
     fun hide(app: LauncherApp) { viewModelScope.launch { repository.setHidden(app, !app.hidden) } }
+    fun searchOnly(app: LauncherApp) { viewModelScope.launch { repository.setSearchOnly(app, !app.searchOnly) } }
+    fun group(app: LauncherApp, name: String?) { viewModelScope.launch { repository.setGroup(app, name) } }
     fun rename(app: LauncherApp, label: String?) { viewModelScope.launch { repository.setLabel(app, label) } }
     fun settings(value: LauncherSettings) { viewModelScope.launch { repository.updateSettings(value) } }
     suspend fun shortcuts(app: LauncherApp) = androidRepository.shortcuts(app)

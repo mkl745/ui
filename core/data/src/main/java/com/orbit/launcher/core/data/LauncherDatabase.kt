@@ -1,5 +1,6 @@
 package com.orbit.launcher.core.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -19,6 +20,8 @@ data class AppPreference(
     val customLabel: String? = null,
     val launches: Int = 0,
     val lastLaunched: Long = 0,
+    @ColumnInfo(defaultValue = "0") val searchOnly: Boolean = false,
+    val groupName: String? = null,
 )
 
 @Dao
@@ -66,7 +69,7 @@ interface WidgetDao {
     suspend fun delete(id: Int)
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class], version = 2, exportSchema = false)
+@Database(entities = [AppPreference::class, WidgetPlacement::class], version = 3, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao

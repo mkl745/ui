@@ -23,7 +23,8 @@ class BackupManager @Inject constructor(
         val entries = JSONArray()
         dao.all().forEach { item ->
             entries.put(JSONObject().put("key", item.key).put("pinned", item.pinned).put("hidden", item.hidden)
-                .put("label", item.customLabel ?: JSONObject.NULL).put("launches", item.launches).put("lastLaunched", item.lastLaunched))
+                .put("label", item.customLabel ?: JSONObject.NULL).put("launches", item.launches).put("lastLaunched", item.lastLaunched)
+                .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL))
         }
         val json = JSONObject().put("version", 1).put("apps", entries).put("settings", JSONObject()
             .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize))
@@ -51,7 +52,9 @@ class BackupManager @Inject constructor(
             val launches = item.getInt("launches")
             val last = item.getLong("lastLaunched")
             require(launches >= 0 && last >= 0)
-            AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last)
+            val group = if (!item.has("group") || item.isNull("group")) null else item.getString("group")
+            require(group == null || group.length <= 60)
+            AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last, item.optBoolean("searchOnly", false), group)
         }
         require(entries.map { it.key }.distinct().size == entries.size)
         dao.replaceAll(entries)

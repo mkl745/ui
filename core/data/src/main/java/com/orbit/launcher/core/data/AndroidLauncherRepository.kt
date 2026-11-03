@@ -103,6 +103,8 @@ class AndroidLauncherRepository @Inject constructor(
                 hidden = preference?.hidden ?: false,
                 launches = preference?.launches ?: 0,
                 lastLaunched = preference?.lastLaunched ?: 0,
+                searchOnly = preference?.searchOnly ?: false,
+                groupName = preference?.groupName,
             )
         }
     }
@@ -125,7 +127,9 @@ class AndroidLauncherRepository @Inject constructor(
 
     override suspend fun setPinned(app: LauncherApp, pinned: Boolean) = update(app) { it.copy(pinned = pinned) }
     override suspend fun setHidden(app: LauncherApp, hidden: Boolean) = update(app) { it.copy(hidden = hidden) }
-    override suspend fun setLabel(app: LauncherApp, label: String?) = update(app) { it.copy(customLabel = label?.trim()?.takeIf(String::isNotEmpty)) }
+    override suspend fun setLabel(app: LauncherApp, label: String?) = update(app) { it.copy(customLabel = label?.trim()?.takeIf(String::isNotEmpty)?.take(100)) }
+    override suspend fun setSearchOnly(app: LauncherApp, searchOnly: Boolean) = update(app) { it.copy(searchOnly = searchOnly) }
+    override suspend fun setGroup(app: LauncherApp, group: String?) = update(app) { it.copy(groupName = group?.trim()?.takeIf(String::isNotEmpty)?.take(60)) }
 
     override suspend fun launch(app: LauncherApp): Boolean {
         val component = ComponentName.unflattenFromString(app.componentName) ?: return false
@@ -184,6 +188,11 @@ object DatabaseModule {
             .addMigrations(object : Migration(1, 2) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`widgetId` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, PRIMARY KEY(`widgetId`))")
+                }
+            }, object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `searchOnly` INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `groupName` TEXT")
                 }
             }).build()
     @Provides fun preferences(database: LauncherDatabase): AppPreferenceDao = database.preferences()

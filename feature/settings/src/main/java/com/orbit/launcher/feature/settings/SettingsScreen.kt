@@ -14,7 +14,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -48,6 +48,16 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         Text("Backup", style = MaterialTheme.typography.titleMedium)
         Text("Save or restore app preferences and settings as JSON. Profile identifiers may differ on another device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         Row { TextButton(onClick = onExport) { Text("Export") }; TextButton(onClick = onRestore) { Text("Restore") } }
+        val searchOnly = apps.filter { it.searchOnly && !it.hidden }.sortedBy { it.label.lowercase() }
+        Spacer(Modifier.height(16.dp))
+        Text("Search-only apps", style = MaterialTheme.typography.titleMedium)
+        if (searchOnly.isEmpty()) Text("No search-only apps", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 12.dp))
+        searchOnly.forEach { app ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(app.label, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onShowInOrbit(app) }) { Text("Show in orbit") }
+            }
+        }
         val hidden = apps.filter { it.hidden }.sortedBy { it.label.lowercase() }
         Spacer(Modifier.height(16.dp))
         Text("Hidden apps", style = MaterialTheme.typography.titleMedium)
