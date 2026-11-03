@@ -66,7 +66,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val suggestions by viewModel.suggestions.collectAsState()
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
-    val packs by produceState(emptyList<com.orbit.launcher.core.domain.IconPack>(), screen) { if (screen == "settings") value = viewModel.installedIconPacks() }
+    var packs by remember { mutableStateOf(emptyList<com.orbit.launcher.core.domain.IconPack>()) }
+    LaunchedEffect(screen) { if (screen == "settings") packs = viewModel.installedIconPacks() }
     var initialQuery by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
@@ -327,9 +328,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 dismissButton = { TextButton(onClick = { renaming = false; selected = null }) { Text("Cancel") } },
             )
         } else {
-            val shortcuts by produceState(emptyList<com.orbit.launcher.core.data.AndroidLauncherRepository.AppShortcut>(), app.key) {
-                value = viewModel.shortcuts(app)
-            }
+            var shortcuts by remember(app.key) { mutableStateOf(emptyList<com.orbit.launcher.core.data.AndroidLauncherRepository.AppShortcut>()) }
+            LaunchedEffect(app.key) { shortcuts = viewModel.shortcuts(app) }
             AlertDialog(
                 onDismissRequest = { selected = null },
                 title = { Text(app.label) },

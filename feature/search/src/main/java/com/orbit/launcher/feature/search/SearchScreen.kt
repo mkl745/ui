@@ -35,14 +35,20 @@ fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQue
     val requester = remember { FocusRequester() }
     val clipboard = LocalClipboardManager.current
     val answer = remember(query) { quickAnswer(query) }
-    val contacts by produceState(emptyList<ContactResult>(), query, settings.contactSearch) {
-        if (settings.contactSearch && query.trim().length >= 2) { delay(200); value = loadContacts(query) }
+    var contacts by remember { mutableStateOf(emptyList<ContactResult>()) }
+    var documents by remember { mutableStateOf(emptyList<DocumentResult>()) }
+    var shortcuts by remember { mutableStateOf(emptyList<SearchShortcut>()) }
+    LaunchedEffect(query, settings.contactSearch) {
+        contacts = emptyList()
+        if (settings.contactSearch && query.trim().length >= 2) { delay(200); contacts = loadContacts(query) }
     }
-    val documents by produceState(emptyList<DocumentResult>(), query, settings.documentTree) {
-        if (settings.documentTree.isNotBlank()) { delay(200); value = loadDocuments(query) }
+    LaunchedEffect(query, settings.documentTree) {
+        documents = emptyList()
+        if (settings.documentTree.isNotBlank()) { delay(200); documents = loadDocuments(query) }
     }
-    val shortcuts by produceState(emptyList<SearchShortcut>(), query, apps) {
-        if (query.trim().length >= 2) { delay(200); value = loadShortcuts(query) }
+    LaunchedEffect(query, apps) {
+        shortcuts = emptyList()
+        if (query.trim().length >= 2) { delay(200); shortcuts = loadShortcuts(query) }
     }
     val results = remember(apps, query) { searchApps(apps.filterNot { it.hidden }, query) }
     LaunchedEffect(Unit) { requester.requestFocus() }
