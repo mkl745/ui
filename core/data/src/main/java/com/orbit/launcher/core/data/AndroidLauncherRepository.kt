@@ -117,6 +117,7 @@ class AndroidLauncherRepository @Inject constructor(
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
     private val updateLock = Mutex()
+    private val usageLock = Mutex()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val iconCache = object : LruCache<String, Bitmap>(16 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
@@ -244,7 +245,9 @@ class AndroidLauncherRepository @Inject constructor(
             it[LOCATION_CATEGORIES] = locationEnabled
             if (!locationEnabled) { it.remove(HOME_ANCHOR); it.remove(WORK_ANCHOR) }
         }
-        if (clearHistory) usageDao.clear() else if (clearLocations) usageDao.clearLocations()
+        if (clearHistory || clearLocations) usageLock.withLock {
+            if (clearHistory) usageDao.clear() else usageDao.clearLocations()
+        }
     }
 
     private val suggestionRefresh = MutableStateFlow(0L)
@@ -267,9 +270,15 @@ class AndroidLauncherRepository @Inject constructor(
         if (place !in setOf("home", "work") || !settings.first().locationCategories) return@withContext false
         val location = lastCoarseLocation() ?: return@withContext false
         val rounded = String.format(Locale.ROOT, "%.2f,%.2f", location.latitude, location.longitude)
-        context.launcherSettings.edit { it[if (place == "home") HOME_ANCHOR else WORK_ANCHOR] = rounded }
-        refreshSuggestions()
-        true
+        var saved = false
+        context.launcherSettings.edit {
+            if (it[LOCATION_CATEGORIES] == true && it[CONTEXT_SUGGESTIONS] == true) {
+                it[if (place == "home") HOME_ANCHOR else WORK_ANCHOR] = rounded
+                saved = true
+            }
+        }
+        if (saved) refreshSuggestions()
+        saved
     }
 
     private fun locationCategory(prefs: LauncherSettings): String? {
@@ -359,11 +368,13 @@ class AndroidLauncherRepository @Inject constructor(
             launcher.startMainActivity(component, profile, null, null)
             val now = System.currentTimeMillis()
             update(app) { it.copy(launches = it.launches + 1, lastLaunched = now) }
-            val prefs = settings.first()
-            if (prefs.contextSuggestions) {
-                val signal = withContext(Dispatchers.IO) { currentContext(prefs) }
-                usageDao.insert(UsageContextEntity(appKey = app.key, hour = signal.hour, weekday = signal.weekday, charging = signal.charging, headphones = signal.headphones, timestamp = now, locationCategory = signal.locationCategory))
-                usageDao.prune()
+            usageLock.withLock {
+                val prefs = settings.first()
+                if (prefs.contextSuggestions) {
+                    val signal = withContext(Dispatchers.IO) { currentContext(prefs) }
+                    usageDao.insert(UsageContextEntity(appKey = app.key, hour = signal.hour, weekday = signal.weekday, charging = signal.charging, headphones = signal.headphones, timestamp = now, locationCategory = signal.locationCategory))
+                    usageDao.prune()
+                }
             }
             true
         } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
