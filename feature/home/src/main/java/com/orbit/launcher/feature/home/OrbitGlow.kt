@@ -51,8 +51,8 @@ fun OrbitGlow(modifier: Modifier, color: Color, reduceMotion: Boolean) {
     val paint = remember(shader) { Paint(Paint.ANTI_ALIAS_FLAG).apply { this.shader = shader } }
     val pulse = if (!reduceMotion) {
         val transition = rememberInfiniteTransition(label = "orbit glow")
-        val value by transition.animateFloat(0.92f, 1.08f, infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "glow pulse")
-        { value }
+        val state = transition.animateFloat(0.92f, 1.08f, infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "glow pulse");
+        { state.value }
     } else {
         { 1f }
     }

@@ -64,6 +64,7 @@ private val THEMED_ICONS = booleanPreferencesKey("themed_icons")
 class AndroidLauncherRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AppPreferenceDao,
+    private val diskCache: IconDiskCache,
 ) : LauncherRepository {
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
@@ -193,8 +194,14 @@ class AndroidLauncherRepository @Inject constructor(
     }
 
     suspend fun icon(app: LauncherApp, pixels: Int, settings: LauncherSettings): Bitmap? = withContext(Dispatchers.IO) {
-        val cacheKey = "${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}"
-        iconCache.get(cacheKey) ?: try {
+        @Suppress("DEPRECATION")
+        val updatedAt = try { context.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime } catch (_: android.content.pm.PackageManager.NameNotFoundException) { 0L }
+        val night = context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        val dynamicAccent = if (settings.dynamicColor && Build.VERSION.SDK_INT >= 31) {
+            context.getColor(if (settings.themeMode == "light" || (settings.themeMode == "system" && night != android.content.res.Configuration.UI_MODE_NIGHT_YES)) android.R.color.system_accent1_700 else android.R.color.system_accent1_200)
+        } else 0
+        val cacheKey = "${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
+        iconCache.get(cacheKey) ?: (if (updatedAt != 0L) diskCache.read(cacheKey, pixels) else null)?.also { iconCache.put(cacheKey, it) } ?: try {
             val profile = user(app.userSerial) ?: return@withContext null
             val info = launcher.getActivityList(app.packageName, profile).firstOrNull {
                 it.componentName.flattenToString() == app.componentName
@@ -202,7 +209,7 @@ class AndroidLauncherRepository @Inject constructor(
             val adaptive = if (Build.VERSION.SDK_INT >= 33 && settings.themedIcons && !app.isWorkProfile) info.getIcon(0) as? AdaptiveIconDrawable else null
             val monochrome = if (Build.VERSION.SDK_INT >= 33) adaptive?.monochrome else null
             val bitmap = if (monochrome != null) {
-                val dark = settings.themeMode != "light"
+                val dark = settings.themeMode != "light" && (settings.themeMode != "system" || night == android.content.res.Configuration.UI_MODE_NIGHT_YES)
                 val color = if (settings.dynamicColor && Build.VERSION.SDK_INT >= 31) {
                     context.getColor(if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_700)
                 } else when (settings.palette) {
@@ -220,7 +227,7 @@ class AndroidLauncherRepository @Inject constructor(
                     icon.draw(canvas)
                 }
             } else info.getBadgedIcon(0).toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
-            bitmap.also { iconCache.put(cacheKey, it) }
+            bitmap.also { iconCache.put(cacheKey, it); if (updatedAt != 0L) diskCache.write(cacheKey, it) }
         } catch (_: SecurityException) { null }
     }
 }
