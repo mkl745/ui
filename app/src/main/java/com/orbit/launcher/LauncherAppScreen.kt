@@ -16,6 +16,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
@@ -131,7 +140,11 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             true
         } else false
     }.focusRequester(homeFocus).focusable()) {
-        when (screen) {
+        AnimatedContent(targetState = screen, label = "launcher screen", transitionSpec = {
+            if (settings.reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+            else (fadeIn(spring()) + scaleIn(spring(), initialScale = .97f)) togetherWith (fadeOut(spring()) + scaleOut(spring(), targetScale = .97f))
+        }) { destination ->
+        when (destination) {
             "search" -> SearchScreen(apps, settings, initialQuery, settings.webSearch, { query ->
                 try { context.startActivity(Intent(Intent.ACTION_WEB_SEARCH).putExtra(android.app.SearchManager.QUERY, query)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "No web search app available", Toast.LENGTH_SHORT).show() }
@@ -150,6 +163,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 authenticate { viewModel.settings(settings.copy(lockHidden = !settings.lockHidden)); hiddenUnlocked = !settings.lockHidden }
             }, { screen = "home" })
             else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" })
+        }
         }
     }
     selected?.let { app ->

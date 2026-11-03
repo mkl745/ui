@@ -100,6 +100,7 @@ fun OrbitHome(
             contentAlignment = Alignment.Center,
         ) {
             val ringColor = MaterialTheme.colorScheme.primary
+            OrbitGlow(Modifier.fillMaxSize(), ringColor, settings.reduceMotion)
             Canvas(Modifier.fillMaxSize()) {
                 listOf(.22f, .36f, .46f).forEach { r ->
                     drawCircle(ringColor.copy(alpha = .18f), radius = size.minDimension * r, style = Stroke(1.dp.toPx()))
