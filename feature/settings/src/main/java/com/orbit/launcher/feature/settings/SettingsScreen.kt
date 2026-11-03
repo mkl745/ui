@@ -14,7 +14,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -63,10 +63,15 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
                 TextButton(onClick = { onShowInOrbit(app) }) { Text("Show in orbit") }
             }
         }
-        val hidden = apps.filter { it.hidden }.sortedBy { it.label.lowercase() }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Protect hidden apps"); Text("Require biometrics to view or restore hidden apps and manage backups", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.lockHidden, { onToggleHiddenLock() })
+        }
+        val hidden = if (!settings.lockHidden || hiddenUnlocked) apps.filter { it.hidden }.sortedBy { it.label.lowercase() } else emptyList()
         Spacer(Modifier.height(16.dp))
         Text("Hidden apps", style = MaterialTheme.typography.titleMedium)
-        if (hidden.isEmpty()) Text("No hidden apps", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 12.dp))
+        if (settings.lockHidden && !hiddenUnlocked) TextButton(onClick = onUnlockHidden) { Text("Unlock hidden apps") }
+        else if (hidden.isEmpty()) Text("No hidden apps", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(top = 12.dp))
         hidden.forEach { app ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(app.label, modifier = Modifier.weight(1f))

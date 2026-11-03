@@ -9,7 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,7 +30,7 @@ import com.orbit.launcher.core.ui.OrbitTheme
 import com.orbit.launcher.feature.home.LauncherFoundationScreen
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val viewModel: LauncherViewModel by viewModels()
     private lateinit var widgetHost: AppWidgetHost
     private var isDefaultHome by mutableStateOf(false)
@@ -46,7 +49,7 @@ class MainActivity : ComponentActivity() {
                 var skippedSetup by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(homeRequests) { if (homeRequests > 0) skippedSetup = false }
                 if (isDefaultHome || skippedSetup) {
-                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests, widgetHost = widgetHost)
+                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests, widgetHost = widgetHost, authenticate = ::authenticate)
                 } else LauncherFoundationScreen(
                     isDefaultHome = isDefaultHome,
                     homeRequests = homeRequests,
@@ -75,6 +78,22 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun authenticate(onSuccess: () -> Unit) {
+        val manager = BiometricManager.from(this)
+        if (manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) != BiometricManager.BIOMETRIC_SUCCESS) {
+            Toast.makeText(this, "Set up biometrics in system settings first", Toast.LENGTH_LONG).show()
+            return
+        }
+        val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { onSuccess() }
+        })
+        val info = BiometricPrompt.PromptInfo.Builder().setTitle("Unlock hidden apps")
+            .setSubtitle("Verify your identity to manage hidden apps and backups")
+            .setNegativeButtonText("Cancel")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK).build()
+        prompt.authenticate(info)
     }
 
     override fun onStart() {

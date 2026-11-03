@@ -40,7 +40,7 @@ class BackupManager @Inject constructor(
         val settingsJson = json.getJSONObject("settings")
         val iconSize = settingsJson.getInt("iconSize")
         require(iconSize in 32..72)
-        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false))
+        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden)
         val array = json.getJSONArray("apps")
         require(array.length() <= 10_000)
         val entries = (0 until array.length()).map { index ->

@@ -9,6 +9,9 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +39,7 @@ import com.orbit.launcher.feature.search.SearchScreen
 import com.orbit.launcher.feature.settings.SettingsScreen
 
 @Composable
-fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost) {
+fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit) {
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val widgets by viewModel.widgets.collectAsState()
@@ -46,11 +49,18 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var grouping by remember { mutableStateOf(false) }
+    var hiddenUnlocked by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) hiddenUnlocked = false }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val widgetManager = remember { AppWidgetManager.getInstance(context) }
     var pendingWidgetId by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
     fun cancelPendingWidget() {
@@ -109,7 +119,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         }
     }
     LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false; grouping = false }
-    LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus() }
+    LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus(); if (screen != "settings") hiddenUnlocked = false }
     BackHandler(enabled = screen != "home" || selected != null) {
         if (selected != null) { selected = null; renaming = false; grouping = false } else screen = "home"
     }
@@ -131,9 +141,13 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 { widget, height -> viewModel.putWidget(widget.widgetId, height) },
                 { widget -> viewModel.removeWidget(widget.widgetId); widgetHost.deleteAppWidgetId(widget.widgetId) },
                 { screen = "home" })
-            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
+            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly,
+                { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; export.launch("orbit-backup.json") } else export.launch("orbit-backup.json") },
+                { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; restore.launch(arrayOf("application/json", "text/json")) } else restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, hiddenUnlocked, { authenticate { hiddenUnlocked = true } }, {
+                authenticate { viewModel.settings(settings.copy(lockHidden = !settings.lockHidden)); hiddenUnlocked = !settings.lockHidden }
             }, { screen = "home" })
             else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" })
         }
