@@ -32,7 +32,9 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          log = Path(os.environ['RUNNER_TEMP'], 'gradle-output.txt').read_text(errors='replace')[-50000:]
+          log = Path(os.environ['RUNNER_TEMP'], 'gradle-output.txt').read_text(errors='replace')[-25000:]
+          for report in Path('app/build/intermediates/lint_intermediate_text_report').rglob('lint-results-debug.txt'):
+              log += '\n\nFULL LINT REPORT (first 20k characters):\n' + report.read_text(errors='replace')[:20000]
           payload = {'name': 'Android build diagnostics', 'head_sha': os.environ['GITHUB_SHA'], 'status': 'completed', 'conclusion': 'failure', 'output': {'title': 'Gradle build failed', 'summary': 'See the captured Gradle output.', 'text': '```\n' + log.replace('```', "'''") + '\n```'}}
           Path(os.environ['RUNNER_TEMP'], 'diagnostics.json').write_text(json.dumps(payload))
           PY
