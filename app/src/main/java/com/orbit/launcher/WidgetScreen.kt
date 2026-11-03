@@ -65,7 +65,7 @@ fun WidgetScreen(
                             val displayedWidth = if (width <= 0f) availableWidth else width.coerceAtMost(availableWidth)
                             Column(Modifier.fillMaxWidth()) {
                                 AndroidView(
-                                    factory = { viewContext: Context -> host.createView(viewContext, widget.widgetId, info).apply { setAppWidget(widget.widgetId, info) } },
+                                    factory = { viewContext: Context -> host.createView(viewContext, widget.widgetId, info) },
                                     modifier = Modifier.width(displayedWidth.dp).height(height.dp),
                                     update = { view: AppWidgetHostView ->
                                         view.post {

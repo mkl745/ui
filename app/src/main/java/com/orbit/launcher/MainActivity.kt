@@ -18,6 +18,8 @@ import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,7 +50,12 @@ class MainActivity : FragmentActivity() {
                 ActivityResultContracts.StartActivityForResult(),
             ) { isDefaultHome = checkDefaultHome() }
             val themeSettings by viewModel.settings.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val darkBars = when (themeSettings.themeMode) { "light" -> false; "system" -> systemDark; else -> true }
             androidx.compose.runtime.SideEffect {
+                val barStyle = if (darkBars) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
                 if (themeSettings.wallpaperEnabled) {
                     window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
                     window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
