@@ -23,7 +23,6 @@ import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.activity.ExperimentalActivityApi
 import androidx.activity.compose.PredictiveBackHandler
 import kotlinx.coroutines.CancellationException
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -62,7 +61,6 @@ import com.orbit.launcher.feature.home.OrbitHome
 import com.orbit.launcher.feature.search.SearchScreen
 import com.orbit.launcher.feature.settings.SettingsScreen
 
-@OptIn(ExperimentalActivityApi::class)
 @Composable
 fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit, onBlur: (Int) -> Unit) {
     val apps by viewModel.apps.collectAsState()
