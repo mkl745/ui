@@ -211,9 +211,10 @@ class AndroidLauncherRepository @Inject constructor(
     override suspend fun updateSettings(settings: LauncherSettings) {
         var clearHistory = false
         var clearLocations = false
+        val locationEnabled = settings.contextSuggestions && settings.locationCategories
         context.launcherSettings.edit {
             clearHistory = it[CONTEXT_SUGGESTIONS] == true && !settings.contextSuggestions
-            clearLocations = it[LOCATION_CATEGORIES] == true && !settings.locationCategories
+            clearLocations = it[LOCATION_CATEGORIES] == true && !locationEnabled
             it[SHOW_LABELS] = settings.showLabels
             it[REDUCE_MOTION] = settings.reduceMotion
             it[ICON_SIZE] = settings.iconSize.coerceIn(32, 72)
@@ -240,8 +241,8 @@ class AndroidLauncherRepository @Inject constructor(
             it[WALLPAPER_ENABLED] = settings.wallpaperEnabled
             it[WALLPAPER_PARALLAX] = settings.wallpaperParallax
             it[BLUR_STRENGTH] = settings.blurStrength.coerceIn(0, 40)
-            it[LOCATION_CATEGORIES] = settings.locationCategories
-            if (!settings.locationCategories) { it.remove(HOME_ANCHOR); it.remove(WORK_ANCHOR) }
+            it[LOCATION_CATEGORIES] = locationEnabled
+            if (!locationEnabled) { it.remove(HOME_ANCHOR); it.remove(WORK_ANCHOR) }
         }
         if (clearHistory) usageDao.clear() else if (clearLocations) usageDao.clearLocations()
     }
