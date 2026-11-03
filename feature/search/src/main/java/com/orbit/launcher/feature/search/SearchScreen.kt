@@ -17,14 +17,19 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.searchApps
+import com.orbit.launcher.core.domain.quickAnswer
 
 @Composable
-fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
+fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, webSearch: Boolean, onWebSearch: (String) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
     var query by remember { mutableStateOf(initialQuery) }
     val requester = remember { FocusRequester() }
+    val clipboard = LocalClipboardManager.current
+    val answer = remember(query) { quickAnswer(query) }
     val results = remember(apps, query) { searchApps(apps.filterNot { it.hidden }, query) }
     LaunchedEffect(Unit) { requester.requestFocus() }
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp)) {
@@ -33,6 +38,12 @@ fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, loadIcon: suspen
             Text("SEARCH YOUR SPACE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
         OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().focusRequester(requester), label = { Text("Search apps") }, singleLine = true)
+        if (answer != null) {
+            TextButton(onClick = { clipboard.setText(AnnotatedString(answer!!)) }, modifier = Modifier.fillMaxWidth()) {
+                Text("$answer  ·  Copy result", color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        if (webSearch && query.isNotBlank()) TextButton(onClick = { onWebSearch(query) }, modifier = Modifier.fillMaxWidth()) { Text("Search the web ↗") }
         Spacer(Modifier.height(12.dp))
         Text("${results.size} apps", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
         if (results.isEmpty()) Text("No matching apps", modifier = Modifier.padding(top = 24.dp), color = MaterialTheme.colorScheme.secondary)

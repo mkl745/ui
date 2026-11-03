@@ -45,6 +45,7 @@ private val Context.launcherSettings by preferencesDataStore(name = "launcher_se
 private val SHOW_LABELS = booleanPreferencesKey("show_labels")
 private val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
 private val ICON_SIZE = intPreferencesKey("icon_size")
+private val WEB_SEARCH = booleanPreferencesKey("web_search")
 
 @Singleton
 class AndroidLauncherRepository @Inject constructor(
@@ -110,7 +111,7 @@ class AndroidLauncherRepository @Inject constructor(
     }
 
     override val settings = context.launcherSettings.data.map {
-        LauncherSettings(it[SHOW_LABELS] ?: true, it[REDUCE_MOTION] ?: false, (it[ICON_SIZE] ?: 48).coerceIn(32, 72))
+        LauncherSettings(it[SHOW_LABELS] ?: true, it[REDUCE_MOTION] ?: false, (it[ICON_SIZE] ?: 48).coerceIn(32, 72), it[WEB_SEARCH] ?: false)
     }
 
     override suspend fun updateSettings(settings: LauncherSettings) {
@@ -118,6 +119,7 @@ class AndroidLauncherRepository @Inject constructor(
             it[SHOW_LABELS] = settings.showLabels
             it[REDUCE_MOTION] = settings.reduceMotion
             it[ICON_SIZE] = settings.iconSize.coerceIn(32, 72)
+            it[WEB_SEARCH] = settings.webSearch
         }
     }
 

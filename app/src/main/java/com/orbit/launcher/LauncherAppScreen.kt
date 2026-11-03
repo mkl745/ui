@@ -122,7 +122,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         } else false
     }.focusRequester(homeFocus).focusable()) {
         when (screen) {
-            "search" -> SearchScreen(apps, initialQuery, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
+            "search" -> SearchScreen(apps, initialQuery, settings.webSearch, { query ->
+                try { context.startActivity(Intent(Intent.ACTION_WEB_SEARCH).putExtra(android.app.SearchManager.QUERY, query)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "No web search app available", Toast.LENGTH_SHORT).show() }
+            }, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "groups" -> GroupsScreen(apps, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
             "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
                 { widget, height -> viewModel.putWidget(widget.widgetId, height) },

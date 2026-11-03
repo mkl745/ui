@@ -41,6 +41,11 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         Text("Icon size · ${settings.iconSize} dp")
         Slider(settings.iconSize.toFloat(), { onChange(settings.copy(iconSize = it.toInt())) }, valueRange = 32f..72f)
         Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Web search"); Text("Adds an option to send your query to another app", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.webSearch, { onChange(settings.copy(webSearch = it)) })
+        }
+        Spacer(Modifier.height(20.dp))
         Text("Notification badges", style = MaterialTheme.typography.titleMedium)
         Text("Allow notification access to show counts. Orbit does not store notification contents.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         TextButton(onClick = onNotificationAccess) { Text("Manage notification access") }

@@ -27,7 +27,7 @@ class BackupManager @Inject constructor(
                 .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL))
         }
         val json = JSONObject().put("version", 1).put("apps", entries).put("settings", JSONObject()
-            .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize))
+            .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch))
         val stream = context.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open backup")
         stream.bufferedWriter(Charsets.UTF_8).use { it.write(json.toString()) }
     }
@@ -40,7 +40,7 @@ class BackupManager @Inject constructor(
         val settingsJson = json.getJSONObject("settings")
         val iconSize = settingsJson.getInt("iconSize")
         require(iconSize in 32..72)
-        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize)
+        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false))
         val array = json.getJSONArray("apps")
         require(array.length() <= 10_000)
         val entries = (0 until array.length()).map { index ->

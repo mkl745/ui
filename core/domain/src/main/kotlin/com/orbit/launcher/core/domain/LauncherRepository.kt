@@ -21,6 +21,7 @@ data class LauncherSettings(
     val showLabels: Boolean = true,
     val reduceMotion: Boolean = false,
     val iconSize: Int = 48,
+    val webSearch: Boolean = false,
 )
 
 interface LauncherRepository {
