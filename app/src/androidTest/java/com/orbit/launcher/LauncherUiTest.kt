@@ -1,5 +1,9 @@
 package com.orbit.launcher
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,7 +29,9 @@ class LauncherUiTest {
         var skipped by mutableStateOf(false)
         compose.setContent {
             OrbitTheme {
-                if (skipped) androidx.compose.material3.Text("Launcher ready")
+                if (skipped) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Text("Launcher ready")
+                }
                 else LauncherFoundationScreen(false, 0, onChooseDefault = {}, onContinue = { skipped = true })
             }
         }
