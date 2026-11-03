@@ -48,7 +48,26 @@ interface AppPreferenceDao {
     }
 }
 
-@Database(entities = [AppPreference::class], version = 1, exportSchema = false)
+@Entity(tableName = "widgets")
+data class WidgetPlacement(
+    @PrimaryKey val widgetId: Int,
+    val heightDp: Int = 180,
+)
+
+@Dao
+interface WidgetDao {
+    @Query("SELECT * FROM widgets ORDER BY widgetId")
+    fun observeAll(): Flow<List<WidgetPlacement>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(widget: WidgetPlacement)
+
+    @Query("DELETE FROM widgets WHERE widgetId = :id")
+    suspend fun delete(id: Int)
+}
+
+@Database(entities = [AppPreference::class, WidgetPlacement::class], version = 2, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
+    abstract fun widgets(): WidgetDao
 }

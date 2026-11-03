@@ -27,6 +27,8 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -178,6 +180,12 @@ abstract class RepositoryModule {
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
     @Provides @Singleton fun database(@ApplicationContext context: Context): LauncherDatabase =
-        Room.databaseBuilder(context, LauncherDatabase::class.java, "orbit.db").build()
+        Room.databaseBuilder(context, LauncherDatabase::class.java, "orbit.db")
+            .addMigrations(object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`widgetId` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, PRIMARY KEY(`widgetId`))")
+                }
+            }).build()
     @Provides fun preferences(database: LauncherDatabase): AppPreferenceDao = database.preferences()
+    @Provides fun widgets(database: LauncherDatabase): WidgetDao = database.widgets()
 }

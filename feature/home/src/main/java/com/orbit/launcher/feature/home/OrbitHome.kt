@@ -53,6 +53,7 @@ fun OrbitHome(
     onMenu: (LauncherApp) -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
+    onWidgets: () -> Unit,
 ) {
     val orbitApps = remember(apps) {
         apps.filterNot { it.hidden }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
@@ -67,7 +68,7 @@ fun OrbitHome(
                 Text("O R B I T", color = Color(0xFFB7C7FF), fontSize = 12.sp)
                 Text("YOUR SPACE", color = Color(0xFF77819D), fontSize = 10.sp, letterSpacing = 2.sp)
             }
-            TextButton(onClick = onSettings) { Text("Settings") }
+            Row { TextButton(onClick = onWidgets) { Text("Widgets") }; TextButton(onClick = onSettings) { Text("Settings") } }
         }
         Spacer(Modifier.weight(1f))
         BoxWithConstraints(

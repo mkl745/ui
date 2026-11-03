@@ -1,5 +1,9 @@
 package com.orbit.launcher
 
+import android.app.Activity
+import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -28,9 +32,10 @@ import com.orbit.launcher.feature.search.SearchScreen
 import com.orbit.launcher.feature.settings.SettingsScreen
 
 @Composable
-fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
+fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost) {
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val widgets by viewModel.widgets.collectAsState()
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
     var initialQuery by rememberSaveable { mutableStateOf("") }
@@ -40,6 +45,51 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
+    val widgetManager = remember { AppWidgetManager.getInstance(context) }
+    var pendingWidgetId by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
+    fun cancelPendingWidget() {
+        if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) widgetHost.deleteAppWidgetId(pendingWidgetId)
+        pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    }
+    fun savePendingWidget() {
+        if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            viewModel.putWidget(pendingWidgetId, 180)
+            pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+        }
+    }
+    val configureWidget = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) savePendingWidget() else cancelPendingWidget()
+    }
+    fun configureOrSaveWidget() {
+        val info = widgetManager.getAppWidgetInfo(pendingWidgetId)
+        if (info == null) { cancelPendingWidget(); Toast.makeText(context, "Widget unavailable", Toast.LENGTH_SHORT).show(); return }
+        if (info.configure == null) { savePendingWidget(); return }
+        try {
+            configureWidget.launch(Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).setComponent(info.configure)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId))
+        } catch (_: ActivityNotFoundException) {
+            cancelPendingWidget(); Toast.makeText(context, "Widget configuration unavailable", Toast.LENGTH_SHORT).show()
+        } catch (_: SecurityException) {
+            cancelPendingWidget(); Toast.makeText(context, "Widget configuration denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val bindWidget = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) configureOrSaveWidget() else cancelPendingWidget()
+    }
+    fun addWidget(provider: AppWidgetProviderInfo) {
+        if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) return
+        pendingWidgetId = widgetHost.allocateAppWidgetId()
+        try {
+            if (widgetManager.bindAppWidgetIdIfAllowed(pendingWidgetId, provider.provider)) configureOrSaveWidget()
+            else bindWidget.launch(Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider.provider))
+        } catch (_: ActivityNotFoundException) {
+            cancelPendingWidget(); Toast.makeText(context, "Widget binding unavailable", Toast.LENGTH_SHORT).show()
+        } catch (_: SecurityException) {
+            cancelPendingWidget(); Toast.makeText(context, "Widget binding denied", Toast.LENGTH_SHORT).show()
+        }
+    }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val success = runCatching { viewModel.exportBackup(uri) }.isSuccess
@@ -67,11 +117,15 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     }.focusRequester(homeFocus).focusable()) {
         when (screen) {
             "search" -> SearchScreen(apps, initialQuery, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
+            "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
+                { widget, height -> viewModel.putWidget(widget.widgetId, height) },
+                { widget -> viewModel.removeWidget(widget.widgetId); widgetHost.deleteAppWidgetId(widget.widgetId) },
+                { screen = "home" })
             "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
             }, { screen = "home" })
-            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" })
+            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" })
         }
     }
     selected?.let { app ->

@@ -1,6 +1,7 @@
 package com.orbit.launcher
 
 import android.app.role.RoleManager
+import android.appwidget.AppWidgetHost
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -28,11 +29,13 @@ import com.orbit.launcher.feature.home.LauncherFoundationScreen
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: LauncherViewModel by viewModels()
+    private lateinit var widgetHost: AppWidgetHost
     private var isDefaultHome by mutableStateOf(false)
     private var homeRequests by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        widgetHost = AppWidgetHost(this, 1024)
         enableEdgeToEdge()
         isDefaultHome = checkDefaultHome()
         setContent {
@@ -43,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 var skippedSetup by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(homeRequests) { if (homeRequests > 0) skippedSetup = false }
                 if (isDefaultHome || skippedSetup) {
-                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests)
+                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests, widgetHost = widgetHost)
                 } else LauncherFoundationScreen(
                     isDefaultHome = isDefaultHome,
                     homeRequests = homeRequests,
@@ -72,6 +75,16 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        widgetHost.startListening()
+    }
+
+    override fun onStop() {
+        widgetHost.stopListening()
+        super.onStop()
     }
 
     override fun onResume() {
