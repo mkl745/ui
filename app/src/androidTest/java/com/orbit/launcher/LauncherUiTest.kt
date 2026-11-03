@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollTo
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 import com.orbit.launcher.core.ui.OrbitTheme
@@ -37,7 +38,7 @@ class LauncherUiTest {
                 else LauncherFoundationScreen(false, 0, onChooseDefault = {}, onContinue = { skipped = true })
             }
         }
-        compose.onNodeWithText("Continue without changing").performClick()
+        compose.onNodeWithText("Continue without changing").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(skipped) }
         compose.onNodeWithText("Launcher ready").assertExists()
         compose.waitUntil(5_000) { compose.onNodeWithText("Launcher ready").isDisplayed() }
