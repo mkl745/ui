@@ -120,6 +120,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var pendingWidgetId by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
     var pendingPlaceholder by rememberSaveable { mutableIntStateOf(AppWidgetManager.INVALID_APPWIDGET_ID) }
     var pendingWidgetHeight by rememberSaveable { mutableIntStateOf(180) }
+    var pendingWidgetWidth by rememberSaveable { mutableIntStateOf(0) }
     fun cancelPendingWidget() {
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) widgetHost.deleteAppWidgetId(pendingWidgetId)
         pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
@@ -128,8 +129,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     fun savePendingWidget() {
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             val provider = widgetManager.getAppWidgetInfo(pendingWidgetId)?.provider?.flattenToString()
-            if (pendingPlaceholder < AppWidgetManager.INVALID_APPWIDGET_ID) viewModel.replaceWidget(pendingPlaceholder, pendingWidgetId, pendingWidgetHeight, provider)
-            else viewModel.putWidget(pendingWidgetId, pendingWidgetHeight, provider)
+            if (pendingPlaceholder < AppWidgetManager.INVALID_APPWIDGET_ID) viewModel.replaceWidget(pendingPlaceholder, pendingWidgetId, pendingWidgetHeight, provider, pendingWidgetWidth)
+            else viewModel.putWidget(pendingWidgetId, pendingWidgetHeight, provider, pendingWidgetWidth)
             pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
             pendingPlaceholder = AppWidgetManager.INVALID_APPWIDGET_ID
         }
@@ -157,6 +158,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         if (pendingWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) return
         pendingPlaceholder = placeholder?.widgetId ?: AppWidgetManager.INVALID_APPWIDGET_ID
         pendingWidgetHeight = placeholder?.heightDp ?: 180
+        pendingWidgetWidth = placeholder?.widthDp ?: 0
         pendingWidgetId = widgetHost.allocateAppWidgetId()
         try {
             if (widgetManager.bindAppWidgetIdIfAllowed(pendingWidgetId, provider.provider)) configureOrSaveWidget()
@@ -284,7 +286,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             "widgets" -> {
                 val widgets by viewModel.widgets.collectAsState()
                 WidgetScreen(widgetHost, widgets, { addWidget(it) },
-                    { widget, height -> viewModel.putWidget(widget.widgetId, height, widget.providerName) },
+                    { widget, height, width -> viewModel.putWidget(widget.widgetId, height, widget.providerName, width) },
                     { widget -> viewModel.removeWidget(widget.widgetId); if (widget.widgetId >= 0) widgetHost.deleteAppWidgetId(widget.widgetId) },
                     { widget, provider -> addWidget(provider, widget) },
                     { screen = "home" })

@@ -41,6 +41,7 @@ class DatabaseMigrationTest {
             assertNull(app.customIconUri)
             database.widgets().put(WidgetPlacement(42, 220, "pkg/pkg.Widget"))
             assertEquals(42, database.widgets().observeAll().first().single().widgetId)
+            assertEquals(0, database.widgets().observeAll().first().single().widthDp)
         } finally {
             database.close()
         }

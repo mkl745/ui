@@ -34,7 +34,7 @@ class BackupManager @Inject constructor(
         val widgetEntries = JSONArray()
         widgetDao.all().forEach { widget ->
             val provider = widget.providerName ?: manager.getAppWidgetInfo(widget.widgetId)?.provider?.flattenToString()
-            if (provider != null) widgetEntries.put(JSONObject().put("provider", provider).put("heightDp", widget.heightDp))
+            if (provider != null) widgetEntries.put(JSONObject().put("provider", provider).put("heightDp", widget.heightDp).put("widthDp", widget.widthDp))
         }
         val json = JSONObject().put("widgets", widgetEntries).put("version", 1).put("apps", entries).put("settings", JSONObject()
             .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch)
@@ -89,19 +89,20 @@ class BackupManager @Inject constructor(
                 val item = list.getJSONObject(index)
                 val provider = item.getString("provider")
                 val height = item.getInt("heightDp")
-                require(provider.length <= 1024 && ComponentName.unflattenFromString(provider) != null && height in 100..600)
-                provider to height
+                val width = item.optInt("widthDp", 0)
+                require(provider.length <= 1024 && ComponentName.unflattenFromString(provider) != null && height in 100..600 && (width == 0 || width in 100..1600))
+                Triple(provider, height, width)
             }
         } else null
         val oldWidgets = if (widgetSpecs != null) widgetDao.all() else emptyList()
         val manager = AppWidgetManager.getInstance(context)
         val remaining = oldWidgets.toMutableList()
-        val restoredWidgets = widgetSpecs?.mapIndexed { index, (provider, height) ->
+        val restoredWidgets = widgetSpecs?.mapIndexed { index, (provider, height, width) ->
             val reusable = remaining.firstOrNull { item ->
                 item.widgetId >= 0 && manager.getAppWidgetInfo(item.widgetId)?.provider?.flattenToString() == provider
             }
-            if (reusable != null) { remaining.remove(reusable); WidgetPlacement(reusable.widgetId, height, provider) }
-            else WidgetPlacement(-2 - index, height, provider)
+            if (reusable != null) { remaining.remove(reusable); WidgetPlacement(reusable.widgetId, height, provider, width) }
+            else WidgetPlacement(-2 - index, height, provider, width)
         }
         dao.replaceAll(entries)
         if (restoredWidgets != null) {

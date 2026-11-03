@@ -57,6 +57,7 @@ data class WidgetPlacement(
     @PrimaryKey val widgetId: Int,
     val heightDp: Int = 180,
     val providerName: String? = null,
+    @ColumnInfo(defaultValue = "0") val widthDp: Int = 0,
 )
 
 @Dao
@@ -109,7 +110,7 @@ interface UsageContextDao {
     @Query("UPDATE usage_context SET locationCategory = NULL") suspend fun clearLocations()
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 7, exportSchema = false)
+@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 8, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao

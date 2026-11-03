@@ -24,7 +24,7 @@ fun WidgetScreen(
     host: AppWidgetHost,
     widgets: List<WidgetPlacement>,
     onAdd: (AppWidgetProviderInfo) -> Unit,
-    onResize: (WidgetPlacement, Int) -> Unit,
+    onResize: (WidgetPlacement, Int, Int) -> Unit,
     onRemove: (WidgetPlacement) -> Unit,
     onRebind: (WidgetPlacement, AppWidgetProviderInfo) -> Unit,
     onBack: () -> Unit,
@@ -58,21 +58,32 @@ fun WidgetScreen(
                         if (missingProvider != null) TextButton(onClick = { onRebind(widget, missingProvider) }) { Text("Restore widget") }
                     } else {
                         val density = LocalDensity.current.density
-                        AndroidView(
-                            factory = { viewContext: Context -> host.createView(viewContext, widget.widgetId, info).apply { setAppWidget(widget.widgetId, info) } },
-                            modifier = Modifier.fillMaxWidth().height(widget.heightDp.dp),
-                            update = { view: AppWidgetHostView ->
-                                // The available width is reported once Android has measured the host view.
-                                view.post {
-                                    val width = (view.width / density).toInt().coerceAtLeast(1)
-                                    @Suppress("DEPRECATION")
-                                    view.updateAppWidgetSize(null, width, widget.heightDp, width, widget.heightDp)
+                        var height by remember(widget.widgetId, widget.heightDp) { mutableFloatStateOf(widget.heightDp.toFloat()) }
+                        var width by remember(widget.widgetId, widget.widthDp) { mutableFloatStateOf(widget.widthDp.toFloat()) }
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val availableWidth = maxWidth.value.coerceAtMost(1600f)
+                            val displayedWidth = if (width <= 0f) availableWidth else width.coerceAtMost(availableWidth)
+                            Column(Modifier.fillMaxWidth()) {
+                                AndroidView(
+                                    factory = { viewContext: Context -> host.createView(viewContext, widget.widgetId, info).apply { setAppWidget(widget.widgetId, info) } },
+                                    modifier = Modifier.width(displayedWidth.dp).height(height.dp),
+                                    update = { view: AppWidgetHostView ->
+                                        view.post {
+                                            val measuredWidth = (view.width / density).toInt().coerceAtLeast(1)
+                                            @Suppress("DEPRECATION")
+                                            view.updateAppWidgetSize(null, measuredWidth, height.toInt(), measuredWidth, height.toInt())
+                                        }
+                                    },
+                                )
+                                if (info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0) {
+                                    Text("Height: ${height.toInt()} dp", style = MaterialTheme.typography.labelSmall)
+                                    Slider(height, { height = it }, onValueChangeFinished = { onResize(widget, height.toInt(), width.toInt()) }, valueRange = 100f..600f)
                                 }
-                            },
-                        )
-                        if (info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0) {
-                            Text("Height: ${widget.heightDp} dp", style = MaterialTheme.typography.labelSmall)
-                            Slider(widget.heightDp.toFloat(), { onResize(widget, it.toInt()) }, valueRange = 100f..600f)
+                                if (info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0 && availableWidth > 100f) {
+                                    Text("Width: ${displayedWidth.toInt()} dp", style = MaterialTheme.typography.labelSmall)
+                                    Slider(displayedWidth, { width = it }, onValueChangeFinished = { onResize(widget, height.toInt(), width.toInt()) }, valueRange = 100f..availableWidth)
+                                }
+                            }
                         }
                     }
                 }
