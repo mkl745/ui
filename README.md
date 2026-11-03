@@ -26,7 +26,7 @@ The app offers the Android home role on Android 10+ or opens system home setting
 
 ## Important remaining work
 
-This project still needs full device validation, localization and RTL coverage, large-font/foldable layout and TalkBack auditing, predictive-back polish, resilient widget restoration across all providers, fully portable icon/permission backups, more nuanced automatic categorization, location-category suggestions, more complete icon-pack compatibility, and a comprehensive gesture/animation and test/performance pass. Automated UI and migration coverage is limited; baseline profiles and performance targets must be generated and measured on representative devices. Do not rely on hidden-app protection as a security boundary.
+This project still needs full device validation, localization and RTL coverage, large-font/foldable layout and TalkBack auditing, predictive-back device validation, resilient widget restoration across all providers, fully portable icon/permission backups, more nuanced automatic categorization, location-category suggestions, more complete icon-pack compatibility, and a comprehensive gesture/animation and test/performance pass. Automated UI and migration coverage is limited; baseline profiles and performance targets must be generated and measured on representative devices. Do not rely on hidden-app protection as a security boundary.
 
 ## Modules
 

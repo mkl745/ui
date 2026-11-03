@@ -23,7 +23,9 @@ import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.activity.compose.BackHandler
+import androidx.activity.ExperimentalActivityApi
+import androidx.activity.compose.PredictiveBackHandler
+import kotlinx.coroutines.CancellationException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
@@ -50,6 +52,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
@@ -59,6 +62,7 @@ import com.orbit.launcher.feature.home.OrbitHome
 import com.orbit.launcher.feature.search.SearchScreen
 import com.orbit.launcher.feature.settings.SettingsScreen
 
+@OptIn(ExperimentalActivityApi::class)
 @Composable
 fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit, onBlur: (Int) -> Unit) {
     val apps by viewModel.apps.collectAsState()
@@ -69,6 +73,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var packs by remember { mutableStateOf(emptyList<com.orbit.launcher.core.domain.IconPack>()) }
     LaunchedEffect(screen) { if (screen == "settings") packs = viewModel.installedIconPacks() }
     var initialQuery by rememberSaveable { mutableStateOf("") }
+    var backProgress by remember { mutableFloatStateOf(0f) }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var grouping by remember { mutableStateOf(false) }
@@ -231,8 +236,15 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     LaunchedEffect(screen, settings.wallpaperEnabled, settings.blurStrength) {
         onBlur(if (settings.wallpaperEnabled && screen != "home") settings.blurStrength else 0)
     }
-    BackHandler(enabled = screen != "home" || selected != null) {
-        if (selected != null) { selected = null; renaming = false; grouping = false } else screen = "home"
+    PredictiveBackHandler(enabled = screen != "home" || selected != null) { progress ->
+        try {
+            progress.collect { event -> backProgress = event.progress }
+            if (selected != null) { selected = null; renaming = false; grouping = false } else screen = "home"
+        } catch (_: CancellationException) {
+            // The user cancelled the back gesture; keep the current screen.
+        } finally {
+            backProgress = 0f
+        }
     }
     Surface(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         val codepoint = event.nativeKeyEvent.unicodeChar
@@ -241,7 +253,12 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             screen = "search"
             true
         } else false
-    }.focusRequester(homeFocus).focusable(), color = if (settings.wallpaperEnabled) { if (screen == "home") Color.Transparent else MaterialTheme.colorScheme.background.copy(alpha = .85f) } else MaterialTheme.colorScheme.background) {
+    }.focusRequester(homeFocus).focusable().graphicsLayer {
+        val progress = if (settings.reduceMotion) 0f else backProgress
+        scaleX = 1f - progress * .04f
+        scaleY = 1f - progress * .04f
+        alpha = 1f - progress * .15f
+    }, color = if (settings.wallpaperEnabled) { if (screen == "home") Color.Transparent else MaterialTheme.colorScheme.background.copy(alpha = .85f) } else MaterialTheme.colorScheme.background) {
         AnimatedContent(targetState = screen, label = "launcher screen", transitionSpec = {
             if (settings.reduceMotion) EnterTransition.None togetherWith ExitTransition.None
             else (fadeIn(spring()) + scaleIn(spring(), initialScale = .97f)) togetherWith (fadeOut(spring()) + scaleOut(spring(), targetScale = .97f))
