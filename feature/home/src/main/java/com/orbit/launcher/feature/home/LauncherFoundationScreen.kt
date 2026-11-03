@@ -42,6 +42,7 @@ fun LauncherFoundationScreen(
     isDefaultHome: Boolean,
     homeRequests: Int,
     onChooseDefault: () -> Unit,
+    onContinue: () -> Unit,
 ) {
     var skippedSetup by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(homeRequests) {
@@ -99,7 +100,7 @@ fun LauncherFoundationScreen(
                     Text(stringResource(if (showSetup) R.string.choose_home else R.string.set_default_home))
                 }
                 if (showSetup) {
-                    TextButton(onClick = { skippedSetup = true }) {
+                    TextButton(onClick = { skippedSetup = true; onContinue() }) {
                         Text(stringResource(R.string.continue_later))
                     }
                 }

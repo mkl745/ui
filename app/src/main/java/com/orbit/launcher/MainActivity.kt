@@ -17,10 +17,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.activity.viewModels
+import dagger.hilt.android.AndroidEntryPoint
 import com.orbit.launcher.core.ui.OrbitTheme
 import com.orbit.launcher.feature.home.LauncherFoundationScreen
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val viewModel: LauncherViewModel by viewModels()
     private var isDefaultHome by mutableStateOf(false)
     private var homeRequests by mutableIntStateOf(0)
 
@@ -33,9 +40,14 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.StartActivityForResult(),
             ) { isDefaultHome = checkDefaultHome() }
             OrbitTheme {
-                LauncherFoundationScreen(
+                var skippedSetup by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(homeRequests) { if (homeRequests > 0) skippedSetup = false }
+                if (isDefaultHome || skippedSetup) {
+                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests)
+                } else LauncherFoundationScreen(
                     isDefaultHome = isDefaultHome,
                     homeRequests = homeRequests,
+                    onContinue = { skippedSetup = true },
                     onChooseDefault = {
                         try {
                             val roleManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
