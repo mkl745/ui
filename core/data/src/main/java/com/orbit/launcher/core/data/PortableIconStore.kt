@@ -28,7 +28,12 @@ class PortableIconStore @Inject constructor(@ApplicationContext private val cont
         val decoded = (context.contentResolver.openInputStream(source) ?: error("Icon is unavailable")).use { BitmapFactory.decodeStream(it, null, options) } ?: error("Invalid icon")
         val thumbnail = Bitmap.createScaledBitmap(decoded, 256, 256, true)
         val output = ByteArrayOutputStream()
-        check(thumbnail.compress(Bitmap.CompressFormat.PNG, 100, output))
+        try {
+            check(thumbnail.compress(Bitmap.CompressFormat.PNG, 100, output))
+        } finally {
+            if (thumbnail !== decoded) decoded.recycle()
+            thumbnail.recycle()
+        }
         val bytes = output.toByteArray()
         require(bytes.size <= 1_048_576)
         return Base64.encodeToString(bytes, Base64.NO_WRAP)
