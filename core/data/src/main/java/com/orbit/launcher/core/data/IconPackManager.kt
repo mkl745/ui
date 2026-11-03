@@ -36,7 +36,8 @@ class IconPackManager @Inject constructor(@ApplicationContext private val contex
             val resources = pm.getResourcesForApplication(pack)
             if (cachedKey != key) {
                 val xmlId = resources.getIdentifier("appfilter", "xml", pack)
-                val parser = if (xmlId != 0) resources.getXml(xmlId) else Xml.newPullParser().apply { setInput(resources.assets.open("appfilter.xml"), "UTF-8") }
+                val stream = if (xmlId == 0) resources.assets.open("appfilter.xml") else null
+                val parser = if (xmlId != 0) resources.getXml(xmlId) else Xml.newPullParser().apply { setInput(stream, "UTF-8") }
                 val icons = mutableMapOf<String, String>()
                 try {
                     var event = parser.eventType
@@ -49,7 +50,7 @@ class IconPackManager @Inject constructor(@ApplicationContext private val contex
                         }
                         event = parser.next()
                     }
-                } finally { (parser as? AutoCloseable)?.close() }
+                } finally { (parser as? AutoCloseable)?.close(); stream?.close() }
                 cachedKey = key
                 cachedIcons = icons
             }

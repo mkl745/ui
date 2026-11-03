@@ -85,6 +85,9 @@ private val CONTACT_SEARCH = booleanPreferencesKey("contact_search")
 private val CONTEXT_SUGGESTIONS = booleanPreferencesKey("context_suggestions")
 private val DOCUMENT_TREE = stringPreferencesKey("document_tree")
 private val ICON_PACK = stringPreferencesKey("icon_pack")
+private val WALLPAPER_ENABLED = booleanPreferencesKey("wallpaper_enabled")
+private val WALLPAPER_PARALLAX = booleanPreferencesKey("wallpaper_parallax")
+private val BLUR_STRENGTH = intPreferencesKey("blur_strength")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
@@ -168,6 +171,8 @@ class AndroidLauncherRepository @Inject constructor(
             contextSuggestions = it[CONTEXT_SUGGESTIONS] ?: false,
             documentTree = it[DOCUMENT_TREE] ?: "",
             iconPack = it[ICON_PACK] ?: "",
+            wallpaperEnabled = it[WALLPAPER_ENABLED] ?: false, wallpaperParallax = it[WALLPAPER_PARALLAX] ?: false,
+            blurStrength = (it[BLUR_STRENGTH] ?: 20).coerceIn(0, 40),
         )
     }
 
@@ -198,6 +203,9 @@ class AndroidLauncherRepository @Inject constructor(
             it[CONTEXT_SUGGESTIONS] = settings.contextSuggestions
             it[DOCUMENT_TREE] = settings.documentTree
             it[ICON_PACK] = settings.iconPack.take(255)
+            it[WALLPAPER_ENABLED] = settings.wallpaperEnabled
+            it[WALLPAPER_PARALLAX] = settings.wallpaperParallax
+            it[BLUR_STRENGTH] = settings.blurStrength.coerceIn(0, 40)
         }
         if (clearHistory) usageDao.clear()
     }

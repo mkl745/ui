@@ -44,6 +44,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
@@ -54,7 +55,7 @@ import com.orbit.launcher.feature.search.SearchScreen
 import com.orbit.launcher.feature.settings.SettingsScreen
 
 @Composable
-fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit) {
+fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit, onBlur: (Int) -> Unit) {
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val widgets by viewModel.widgets.collectAsState()
@@ -170,17 +171,20 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     }
     LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false; grouping = false }
     LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus(); if (screen != "settings") hiddenUnlocked = false }
+    LaunchedEffect(screen, settings.wallpaperEnabled, settings.blurStrength) {
+        onBlur(if (settings.wallpaperEnabled && screen != "home") settings.blurStrength else 0)
+    }
     BackHandler(enabled = screen != "home" || selected != null) {
         if (selected != null) { selected = null; renaming = false; grouping = false } else screen = "home"
     }
-    Surface(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onPreviewKeyEvent { event ->
+    Surface(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         val codepoint = event.nativeKeyEvent.unicodeChar
         if (screen == "home" && selected == null && event.type == KeyEventType.KeyDown && codepoint > 0 && !Character.isISOControl(codepoint)) {
             initialQuery = String(Character.toChars(codepoint))
             screen = "search"
             true
         } else false
-    }.focusRequester(homeFocus).focusable()) {
+    }.focusRequester(homeFocus).focusable(), color = if (settings.wallpaperEnabled && screen == "home") Color.Transparent else MaterialTheme.colorScheme.background) {
         AnimatedContent(targetState = screen, label = "launcher screen", transitionSpec = {
             if (settings.reduceMotion) EnterTransition.None togetherWith ExitTransition.None
             else (fadeIn(spring()) + scaleIn(spring(), initialScale = .97f)) togetherWith (fadeOut(spring()) + scaleOut(spring(), targetScale = .97f))

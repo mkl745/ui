@@ -59,6 +59,19 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPack
         Text("Corner radius · ${settings.cornerRadius} dp")
         Slider(settings.cornerRadius.toFloat(), { onChange(settings.copy(cornerRadius = it.toInt())) }, valueRange = 0f..32f)
         Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Show system wallpaper"); Text("Static and live wallpapers are provided by Android", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.wallpaperEnabled, { onChange(settings.copy(wallpaperEnabled = it)) })
+        }
+        if (settings.wallpaperEnabled) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) { Text("Wallpaper parallax"); Text("Move supported wallpapers with orbit rotation", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+                Switch(settings.wallpaperParallax, { onChange(settings.copy(wallpaperParallax = it)) })
+            }
+            Text("Background blur · ${settings.blurStrength}")
+            Slider(settings.blurStrength.toFloat(), { onChange(settings.copy(blurStrength = it.toInt())) }, valueRange = 0f..40f)
+            Text("Blur depends on Android 12+ and device support.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        }
         Text("Icon pack", style = MaterialTheme.typography.titleSmall)
         TextButton(onClick = { onChange(settings.copy(iconPack = "")) }) { Text(if (settings.iconPack.isBlank()) "System icons ✓" else "System icons") }
         iconPacks.forEach { pack -> TextButton(onClick = { onChange(settings.copy(iconPack = pack.packageName)) }) { Text(pack.label + if (settings.iconPack == pack.packageName) " ✓" else "") } }

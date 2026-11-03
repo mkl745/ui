@@ -1,6 +1,7 @@
 package com.orbit.launcher.feature.home
 
 import android.graphics.Bitmap
+import android.app.WallpaperManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
@@ -69,9 +72,24 @@ fun OrbitHome(
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val wallpaper = WallpaperManager.getInstance(LocalContext.current)
+    LaunchedEffect(settings.wallpaperEnabled, settings.wallpaperParallax, settings.reduceMotion) {
+        if (settings.wallpaperEnabled && settings.wallpaperParallax && !settings.reduceMotion) {
+            var lastUpdate = 0L
+            snapshotFlow { rotation.value }.collect { angle ->
+                val now = android.os.SystemClock.uptimeMillis()
+                if (now - lastUpdate >= 50) {
+                    lastUpdate = now
+                    try { wallpaper.setWallpaperOffsets(view.windowToken, (.5f + .12f * kotlin.math.sin(angle * Math.PI.toFloat() / 180)).coerceIn(0f, 1f), .5f) } catch (_: RuntimeException) { }
+                }
+            }
+        }
+    }
+    DisposableEffect(wallpaper) { onDispose { try { wallpaper.setWallpaperOffsets(view.windowToken, .5f, .5f) } catch (_: RuntimeException) { } } }
     val latestGesture by rememberUpdatedState(onGesture)
     var twoFingerActive by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().background(if (settings.wallpaperEnabled) Color.Black.copy(alpha = .48f) else MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text("O R B I T", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)

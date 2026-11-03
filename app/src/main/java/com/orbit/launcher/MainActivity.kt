@@ -6,6 +6,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.view.WindowManager
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -46,11 +48,22 @@ class MainActivity : FragmentActivity() {
                 ActivityResultContracts.StartActivityForResult(),
             ) { isDefaultHome = checkDefaultHome() }
             val themeSettings by viewModel.settings.collectAsState()
+            androidx.compose.runtime.SideEffect {
+                if (themeSettings.wallpaperEnabled) {
+                    window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+                    window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.rgb(9, 12, 21)))
+                }
+            }
             OrbitTheme(themeSettings) {
                 var skippedSetup by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(homeRequests) { if (homeRequests > 0) skippedSetup = false }
                 if (isDefaultHome || skippedSetup) {
-                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests, widgetHost = widgetHost, authenticate = ::authenticate)
+                    LauncherAppScreen(viewModel = viewModel, homeRequests = homeRequests, widgetHost = widgetHost, authenticate = ::authenticate, onBlur = { radius ->
+                        if (Build.VERSION.SDK_INT >= 31) window.setBackgroundBlurRadius(radius)
+                    })
                 } else LauncherFoundationScreen(
                     isDefaultHome = isDefaultHome,
                     homeRequests = homeRequests,

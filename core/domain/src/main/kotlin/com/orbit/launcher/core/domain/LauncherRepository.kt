@@ -47,6 +47,9 @@ data class LauncherSettings(
     val contextSuggestions: Boolean = false,
     val documentTree: String = "",
     val iconPack: String = "",
+    val wallpaperEnabled: Boolean = false,
+    val wallpaperParallax: Boolean = false,
+    val blurStrength: Int = 20,
 )
 
 interface LauncherRepository {

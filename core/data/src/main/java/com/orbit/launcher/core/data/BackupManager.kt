@@ -31,7 +31,8 @@ class BackupManager @Inject constructor(
             .put("themeMode", settings.themeMode).put("dynamicColor", settings.dynamicColor).put("palette", settings.palette)
             .put("font", settings.font).put("cornerRadius", settings.cornerRadius).put("iconShape", settings.iconShape).put("themedIcons", settings.themedIcons)
             .put("swipeUp", settings.swipeUp).put("swipeDown", settings.swipeDown).put("swipeLeft", settings.swipeLeft).put("swipeRight", settings.swipeRight)
-            .put("doubleTap", settings.doubleTap).put("emptyLongPress", settings.emptyLongPress).put("twoFinger", settings.twoFinger).put("iconPack", settings.iconPack))
+            .put("doubleTap", settings.doubleTap).put("emptyLongPress", settings.emptyLongPress).put("twoFinger", settings.twoFinger).put("iconPack", settings.iconPack)
+            .put("wallpaperEnabled", settings.wallpaperEnabled).put("wallpaperParallax", settings.wallpaperParallax).put("blurStrength", settings.blurStrength))
         val stream = context.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open backup")
         stream.bufferedWriter(Charsets.UTF_8).use { it.write(json.toString()) }
     }
@@ -52,7 +53,7 @@ class BackupManager @Inject constructor(
         require(themeMode in setOf("system", "dark", "light", "amoled") && palette in setOf("violet", "cyan", "amber") && font in setOf("sans", "serif", "mono") && radius in 0..32 && iconShape in setOf("circle", "squircle", "teardrop", "square"))
         val allowedActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
         fun action(name: String, default: String): String = settingsJson.optString(name, default).also { require(it in allowedActions) }
-        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden, themeMode, settingsJson.optBoolean("dynamicColor", false), palette, font, radius, iconShape, settingsJson.optBoolean("themedIcons", false), action("swipeUp", "search"), action("swipeDown", "notifications"), action("swipeLeft", "none"), action("swipeRight", "none"), action("doubleTap", "search"), action("emptyLongPress", "settings"), action("twoFinger", "none"), repository.settings.first().contactSearch, repository.settings.first().contextSuggestions, repository.settings.first().documentTree, settingsJson.optString("iconPack", "").also { require(it.length <= 255) })
+        val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden, themeMode, settingsJson.optBoolean("dynamicColor", false), palette, font, radius, iconShape, settingsJson.optBoolean("themedIcons", false), action("swipeUp", "search"), action("swipeDown", "notifications"), action("swipeLeft", "none"), action("swipeRight", "none"), action("doubleTap", "search"), action("emptyLongPress", "settings"), action("twoFinger", "none"), repository.settings.first().contactSearch, repository.settings.first().contextSuggestions, repository.settings.first().documentTree, settingsJson.optString("iconPack", "").also { require(it.length <= 255) }, settingsJson.optBoolean("wallpaperEnabled", false), settingsJson.optBoolean("wallpaperParallax", false), settingsJson.optInt("blurStrength", 20).also { require(it in 0..40) })
         val array = json.getJSONArray("apps")
         require(array.length() <= 10_000)
         val entries = (0 until array.length()).map { index ->
