@@ -17,6 +17,7 @@ data class LauncherApp(
     val groupName: String? = null,
 )
 
+data class IconPack(val packageName: String, val label: String)
 data class SearchShortcut(val app: LauncherApp, val id: String, val label: String)
 data class DocumentResult(val uri: String, val name: String, val mimeType: String, val lastModified: Long)
 
@@ -45,6 +46,7 @@ data class LauncherSettings(
     val contactSearch: Boolean = false,
     val contextSuggestions: Boolean = false,
     val documentTree: String = "",
+    val iconPack: String = "",
 )
 
 interface LauncherRepository {

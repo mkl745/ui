@@ -13,10 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.orbit.launcher.core.domain.LauncherApp
+import com.orbit.launcher.core.domain.IconPack
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onChooseFolder: () -> Unit, onClearFolder: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPacks: List<IconPack>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onChooseFolder: () -> Unit, onClearFolder: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -58,6 +59,9 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         Text("Corner radius · ${settings.cornerRadius} dp")
         Slider(settings.cornerRadius.toFloat(), { onChange(settings.copy(cornerRadius = it.toInt())) }, valueRange = 0f..32f)
         Spacer(Modifier.height(16.dp))
+        Text("Icon pack", style = MaterialTheme.typography.titleSmall)
+        TextButton(onClick = { onChange(settings.copy(iconPack = "")) }) { Text(if (settings.iconPack.isBlank()) "System icons ✓" else "System icons") }
+        iconPacks.forEach { pack -> TextButton(onClick = { onChange(settings.copy(iconPack = pack.packageName)) }) { Text(pack.label + if (settings.iconPack == pack.packageName) " ✓" else "") } }
         Text("Icon shape: ${settings.iconShape}")
         Row { listOf("circle", "squircle", "teardrop", "square").forEach { shape ->
             TextButton(onClick = { onChange(settings.copy(iconShape = shape)) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text(shape) }

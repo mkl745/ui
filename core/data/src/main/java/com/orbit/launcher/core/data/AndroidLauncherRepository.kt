@@ -84,6 +84,7 @@ private val TWO_FINGER = stringPreferencesKey("two_finger")
 private val CONTACT_SEARCH = booleanPreferencesKey("contact_search")
 private val CONTEXT_SUGGESTIONS = booleanPreferencesKey("context_suggestions")
 private val DOCUMENT_TREE = stringPreferencesKey("document_tree")
+private val ICON_PACK = stringPreferencesKey("icon_pack")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
@@ -92,6 +93,7 @@ class AndroidLauncherRepository @Inject constructor(
     private val dao: AppPreferenceDao,
     private val diskCache: IconDiskCache,
     private val usageDao: UsageContextDao,
+    private val iconPacks: IconPackManager,
 ) : LauncherRepository {
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
@@ -165,6 +167,7 @@ class AndroidLauncherRepository @Inject constructor(
             contactSearch = it[CONTACT_SEARCH] ?: false,
             contextSuggestions = it[CONTEXT_SUGGESTIONS] ?: false,
             documentTree = it[DOCUMENT_TREE] ?: "",
+            iconPack = it[ICON_PACK] ?: "",
         )
     }
 
@@ -194,6 +197,7 @@ class AndroidLauncherRepository @Inject constructor(
             it[CONTACT_SEARCH] = settings.contactSearch
             it[CONTEXT_SUGGESTIONS] = settings.contextSuggestions
             it[DOCUMENT_TREE] = settings.documentTree
+            it[ICON_PACK] = settings.iconPack.take(255)
         }
         if (clearHistory) usageDao.clear()
     }
@@ -315,6 +319,8 @@ class AndroidLauncherRepository @Inject constructor(
         } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
     }
 
+    suspend fun installedIconPacks() = withContext(Dispatchers.IO) { iconPacks.installed() }
+
     suspend fun icon(app: LauncherApp, pixels: Int, settings: LauncherSettings): Bitmap? = withContext(Dispatchers.IO) {
         @Suppress("DEPRECATION")
         val updatedAt = try { context.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime } catch (_: android.content.pm.PackageManager.NameNotFoundException) { 0L }
@@ -322,15 +328,19 @@ class AndroidLauncherRepository @Inject constructor(
         val dynamicAccent = if (settings.dynamicColor && Build.VERSION.SDK_INT >= 31) {
             context.getColor(if (settings.themeMode == "light" || (settings.themeMode == "system" && night != android.content.res.Configuration.UI_MODE_NIGHT_YES)) android.R.color.system_accent1_700 else android.R.color.system_accent1_200)
         } else 0
-        val cacheKey = "${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
+        @Suppress("DEPRECATION")
+        val packUpdatedAt = if (settings.iconPack.isBlank()) 0L else try { context.packageManager.getPackageInfo(settings.iconPack, 0).lastUpdateTime } catch (_: android.content.pm.PackageManager.NameNotFoundException) { 0L }
+        val cacheKey = "${settings.iconPack}:$packUpdatedAt:${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
         iconCache.get(cacheKey) ?: (if (updatedAt != 0L) diskCache.read(cacheKey, pixels) else null)?.also { iconCache.put(cacheKey, it) } ?: try {
             val profile = user(app.userSerial) ?: return@withContext null
             val info = launcher.getActivityList(app.packageName, profile).firstOrNull {
                 it.componentName.flattenToString() == app.componentName
             } ?: return@withContext null
-            val adaptive = if (Build.VERSION.SDK_INT >= 33 && settings.themedIcons && !app.isWorkProfile) info.getIcon(0) as? AdaptiveIconDrawable else null
+            val packed = if (settings.iconPack.isNotBlank()) iconPacks.icon(settings.iconPack, app.componentName) else null
+            val badgedPacked = if (packed != null && app.isWorkProfile) context.packageManager.getUserBadgedIcon(packed, profile) else packed
+            val adaptive = if (badgedPacked == null && Build.VERSION.SDK_INT >= 33 && settings.themedIcons && !app.isWorkProfile) info.getIcon(0) as? AdaptiveIconDrawable else null
             val monochrome = if (Build.VERSION.SDK_INT >= 33) adaptive?.monochrome else null
-            val bitmap = if (monochrome != null) {
+            val bitmap = if (badgedPacked != null) badgedPacked.toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888) else if (monochrome != null) {
                 val dark = settings.themeMode != "light" && (settings.themeMode != "system" || night == android.content.res.Configuration.UI_MODE_NIGHT_YES)
                 val color = if (settings.dynamicColor && Build.VERSION.SDK_INT >= 31) {
                     context.getColor(if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_700)

@@ -59,6 +59,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val settings by viewModel.settings.collectAsState()
     val widgets by viewModel.widgets.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
+    val packs by produceState(emptyList<com.orbit.launcher.core.domain.IconPack>()) { value = viewModel.installedIconPacks() }
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
     var initialQuery by rememberSaveable { mutableStateOf("") }
@@ -204,7 +205,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 { widget, height -> viewModel.putWidget(widget.widgetId, height) },
                 { widget -> viewModel.removeWidget(widget.widgetId); widgetHost.deleteAppWidgetId(widget.widgetId) },
                 { screen = "home" })
-            "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly,
+            "settings" -> SettingsScreen(settings, apps, packs, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly,
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; export.launch("orbit-backup.json") } else export.launch("orbit-backup.json") },
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; restore.launch(arrayOf("application/json", "text/json")) } else restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }

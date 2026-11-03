@@ -181,7 +181,7 @@ fun AppOrb(
 ) {
     val density = LocalDensity.current
     val pixels = with(density) { settings.iconSize.dp.roundToPx() }.coerceAtLeast(1)
-    val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor) { value = loadIcon(app, pixels) }
+    val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack) { value = loadIcon(app, pixels) }
     val shape = when (settings.iconShape) {
         "squircle" -> RoundedCornerShape(24)
         "teardrop" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomStartPercent = 50, bottomEndPercent = 8)
