@@ -40,11 +40,14 @@ data class LauncherSettings(
     val emptyLongPress: String = "settings",
     val twoFinger: String = "none",
     val contactSearch: Boolean = false,
+    val contextSuggestions: Boolean = false,
 )
 
 interface LauncherRepository {
     val apps: Flow<List<LauncherApp>>
     val settings: Flow<LauncherSettings>
+    val suggestedApps: Flow<List<LauncherApp>>
+    fun refreshSuggestions()
     suspend fun launch(app: LauncherApp): Boolean
     suspend fun setPinned(app: LauncherApp, pinned: Boolean)
     suspend fun setHidden(app: LauncherApp, hidden: Boolean)

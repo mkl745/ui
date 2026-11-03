@@ -49,6 +49,7 @@ import kotlin.math.sin
 @Composable
 fun OrbitHome(
     apps: List<LauncherApp>,
+    suggestions: List<LauncherApp>,
     settings: LauncherSettings,
     badgeCounts: Map<String, Int>,
     loadIcon: suspend (LauncherApp, Int) -> Bitmap?,
@@ -60,9 +61,10 @@ fun OrbitHome(
     onGroups: () -> Unit,
     onGesture: (String) -> Unit,
 ) {
-    val orbitApps = remember(apps) {
+    val orbitApps = remember(apps, suggestions) {
+        val ranks = suggestions.mapIndexed { index, app -> app.key to index }.toMap()
         apps.filterNot { it.hidden || it.searchOnly }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
-            .thenByDescending { it.launches }.thenByDescending { it.lastLaunched }.thenBy { it.label.lowercase() }).take(16)
+            .thenBy { ranks[it.key] ?: Int.MAX_VALUE }.thenByDescending { it.launches }.thenByDescending { it.lastLaunched }.thenBy { it.label.lowercase() }).take(16)
     }
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()

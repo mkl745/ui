@@ -69,8 +69,30 @@ interface WidgetDao {
     suspend fun delete(id: Int)
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class], version = 3, exportSchema = false)
+@Entity(tableName = "usage_context")
+data class UsageContextEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val appKey: String,
+    val hour: Int,
+    val weekday: Int,
+    val charging: Boolean,
+    val headphones: Boolean,
+    val timestamp: Long,
+)
+
+@Dao
+interface UsageContextDao {
+    @Query("SELECT * FROM usage_context ORDER BY id DESC LIMIT 1000")
+    fun observeRecent(): Flow<List<UsageContextEntity>>
+    @Insert suspend fun insert(event: UsageContextEntity)
+    @Query("DELETE FROM usage_context WHERE id NOT IN (SELECT id FROM usage_context ORDER BY id DESC LIMIT 1000)")
+    suspend fun prune()
+    @Query("DELETE FROM usage_context") suspend fun clear()
+}
+
+@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 4, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao
+    abstract fun usageContext(): UsageContextDao
 }

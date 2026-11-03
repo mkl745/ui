@@ -110,6 +110,7 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         isDefaultHome = checkDefaultHome()
+        viewModel.refreshSuggestions()
     }
 
     override fun onNewIntent(intent: Intent) {

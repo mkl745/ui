@@ -58,6 +58,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val widgets by viewModel.widgets.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
     var initialQuery by rememberSaveable { mutableStateOf("") }
@@ -193,6 +194,9 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             }, {
                 try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Accessibility settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, {
+                try { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "Usage settings unavailable", Toast.LENGTH_SHORT).show() }
             }, { enabled ->
                 if (!enabled) viewModel.settings(settings.copy(contactSearch = false))
                 else if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) viewModel.settings(settings.copy(contactSearch = true))
@@ -200,7 +204,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             }, hiddenUnlocked, { authenticate { hiddenUnlocked = true } }, {
                 authenticate { viewModel.settings(settings.copy(lockHidden = !settings.lockHidden)); hiddenUnlocked = !settings.lockHidden }
             }, { screen = "home" })
-            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" }, ::performGesture)
+            else -> OrbitHome(apps, suggestions, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" }, ::performGesture)
         }
         }
     }

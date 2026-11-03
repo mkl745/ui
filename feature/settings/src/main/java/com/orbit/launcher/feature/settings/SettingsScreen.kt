@@ -16,7 +16,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -78,6 +78,15 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
             Switch(settings.webSearch, { onChange(settings.copy(webSearch = it)) })
         }
         Spacer(Modifier.height(20.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Context suggestions"); Text("Learn from time, day, charging and headphones on this device. Turning this off deletes Orbit's context history.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.contextSuggestions, { onChange(settings.copy(contextSuggestions = it)) })
+        }
+        if (settings.contextSuggestions) {
+            Text("Optionally include device usage events by granting usage access in system settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            TextButton(onClick = onUsageAccess) { Text("Manage usage access") }
+        }
+        Spacer(Modifier.height(16.dp))
         Text("Gestures", style = MaterialTheme.typography.titleMedium)
         Text("Swipe left and right still rotate the rings when their action is None.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         GestureSetting("Swipe up", settings.swipeUp) { onChange(settings.copy(swipeUp = it)) }

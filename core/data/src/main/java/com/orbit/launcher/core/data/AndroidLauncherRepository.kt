@@ -2,6 +2,15 @@ package com.orbit.launcher.core.data
 
 import android.content.ComponentName
 import android.content.Context
+import android.app.AppOpsManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.BatteryManager
+import java.util.Calendar
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -20,6 +29,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.orbit.launcher.core.domain.CurrentContext
+import com.orbit.launcher.core.domain.UsageContext
+import com.orbit.launcher.core.domain.rankContextApps
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherRepository
 import com.orbit.launcher.core.domain.LauncherSettings
@@ -37,6 +49,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
@@ -67,6 +81,7 @@ private val DOUBLE_TAP = stringPreferencesKey("double_tap")
 private val EMPTY_LONG_PRESS = stringPreferencesKey("empty_long_press")
 private val TWO_FINGER = stringPreferencesKey("two_finger")
 private val CONTACT_SEARCH = booleanPreferencesKey("contact_search")
+private val CONTEXT_SUGGESTIONS = booleanPreferencesKey("context_suggestions")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
@@ -74,6 +89,7 @@ class AndroidLauncherRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AppPreferenceDao,
     private val diskCache: IconDiskCache,
+    private val usageDao: UsageContextDao,
 ) : LauncherRepository {
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
@@ -145,11 +161,14 @@ class AndroidLauncherRepository @Inject constructor(
             swipeLeft = it[SWIPE_LEFT] ?: "none", swipeRight = it[SWIPE_RIGHT] ?: "none",
             doubleTap = it[DOUBLE_TAP] ?: "search", emptyLongPress = it[EMPTY_LONG_PRESS] ?: "settings", twoFinger = it[TWO_FINGER] ?: "none",
             contactSearch = it[CONTACT_SEARCH] ?: false,
+            contextSuggestions = it[CONTEXT_SUGGESTIONS] ?: false,
         )
     }
 
     override suspend fun updateSettings(settings: LauncherSettings) {
+        var clearHistory = false
         context.launcherSettings.edit {
+            clearHistory = it[CONTEXT_SUGGESTIONS] == true && !settings.contextSuggestions
             it[SHOW_LABELS] = settings.showLabels
             it[REDUCE_MOTION] = settings.reduceMotion
             it[ICON_SIZE] = settings.iconSize.coerceIn(32, 72)
@@ -170,8 +189,60 @@ class AndroidLauncherRepository @Inject constructor(
             it[EMPTY_LONG_PRESS] = settings.emptyLongPress.takeIf { v -> v in gestureActions } ?: "none"
             it[TWO_FINGER] = settings.twoFinger.takeIf { v -> v in gestureActions } ?: "none"
             it[CONTACT_SEARCH] = settings.contactSearch
+            it[CONTEXT_SUGGESTIONS] = settings.contextSuggestions
         }
+        if (clearHistory) usageDao.clear()
     }
+
+    private val suggestionRefresh = MutableStateFlow(0L)
+    override fun refreshSuggestions() { suggestionRefresh.value = System.currentTimeMillis() }
+
+    private fun currentContext(): CurrentContext {
+        val now = Calendar.getInstance()
+        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val status = battery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        val audio = context.getSystemService(AudioManager::class.java)
+        val headphones = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+            it.type in setOf(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_USB_HEADSET)
+        }
+        return CurrentContext(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.DAY_OF_WEEK), charging, headphones)
+    }
+
+    private fun systemUsage(apps: List<LauncherApp>): List<UsageContext> {
+        val appOps = context.getSystemService(AppOpsManager::class.java)
+        @Suppress("DEPRECATION")
+        val allowed = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
+        if (!allowed) return emptyList()
+        return try {
+            val now = System.currentTimeMillis()
+            val events = context.getSystemService(UsageStatsManager::class.java).queryEvents(now - 7 * 86_400_000L, now)
+            val event = UsageEvents.Event()
+            val byPackage = apps.filterNot { it.isWorkProfile }.groupBy { it.packageName }
+            val result = mutableListOf<UsageContext>()
+            val calendar = Calendar.getInstance()
+            var scanned = 0
+            @Suppress("DEPRECATION")
+            while (events.hasNextEvent() && scanned++ < 30_000) {
+                events.getNextEvent(event)
+                if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                    val app = byPackage[event.packageName]?.firstOrNull() ?: continue
+                    calendar.timeInMillis = event.timeStamp
+                    result.add(UsageContext(app.key, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.DAY_OF_WEEK), null, null, event.timeStamp))
+                }
+            }
+            result
+        } catch (_: SecurityException) { emptyList() }
+    }
+
+    override val suggestedApps: Flow<List<LauncherApp>> = combine(apps, usageDao.observeRecent(), settings, suggestionRefresh) { appList, entries, prefs, _ ->
+        Triple(appList, entries, prefs)
+    }.map { (appList, entries, prefs) ->
+        if (!prefs.contextSuggestions) emptyList() else {
+            val local = entries.map { UsageContext(it.appKey, it.hour, it.weekday, it.charging, it.headphones, it.timestamp) }
+            rankContextApps(appList, local + systemUsage(appList), currentContext(), System.currentTimeMillis()).take(6)
+        }
+    }.flowOn(Dispatchers.IO)
 
     private suspend fun update(app: LauncherApp, change: (AppPreference) -> AppPreference) {
         updateLock.withLock { dao.put(change(dao.find(app.key) ?: AppPreference(app.key))) }
@@ -188,7 +259,13 @@ class AndroidLauncherRepository @Inject constructor(
         val profile = user(app.userSerial) ?: return false
         return try {
             launcher.startMainActivity(component, profile, null, null)
-            update(app) { it.copy(launches = it.launches + 1, lastLaunched = System.currentTimeMillis()) }
+            val now = System.currentTimeMillis()
+            update(app) { it.copy(launches = it.launches + 1, lastLaunched = now) }
+            if (settings.first().contextSuggestions) {
+                val signal = withContext(Dispatchers.IO) { currentContext() }
+                usageDao.insert(UsageContextEntity(appKey = app.key, hour = signal.hour, weekday = signal.weekday, charging = signal.charging, headphones = signal.headphones, timestamp = now))
+                usageDao.prune()
+            }
             true
         } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
     }
@@ -273,7 +350,12 @@ object DatabaseModule {
                     db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `searchOnly` INTEGER NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `groupName` TEXT")
                 }
+            }, object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE IF NOT EXISTS `usage_context` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `appKey` TEXT NOT NULL, `hour` INTEGER NOT NULL, `weekday` INTEGER NOT NULL, `charging` INTEGER NOT NULL, `headphones` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL)")
+                }
             }).build()
     @Provides fun preferences(database: LauncherDatabase): AppPreferenceDao = database.preferences()
     @Provides fun widgets(database: LauncherDatabase): WidgetDao = database.widgets()
+    @Provides fun usageContext(database: LauncherDatabase): UsageContextDao = database.usageContext()
 }
