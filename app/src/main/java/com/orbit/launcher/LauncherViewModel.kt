@@ -40,5 +40,5 @@ class LauncherViewModel @Inject constructor(
     fun launchShortcut(app: LauncherApp, id: String) = androidRepository.launchShortcut(app, id)
     suspend fun exportBackup(uri: Uri) = backupManager.export(uri)
     suspend fun restoreBackup(uri: Uri) = backupManager.restore(uri)
-    suspend fun icon(app: LauncherApp, pixels: Int): Bitmap? = androidRepository.icon(app, pixels)
+    suspend fun icon(app: LauncherApp, pixels: Int): Bitmap? = androidRepository.icon(app, pixels, settings.value)
 }

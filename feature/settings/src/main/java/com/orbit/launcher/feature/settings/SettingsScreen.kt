@@ -56,6 +56,14 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         Text("Corner radius · ${settings.cornerRadius} dp")
         Slider(settings.cornerRadius.toFloat(), { onChange(settings.copy(cornerRadius = it.toInt())) }, valueRange = 0f..32f)
         Spacer(Modifier.height(16.dp))
+        Text("Icon shape: ${settings.iconShape}")
+        Row { listOf("circle", "squircle", "teardrop", "square").forEach { shape ->
+            TextButton(onClick = { onChange(settings.copy(iconShape = shape)) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text(shape) }
+        } }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) { Text("Themed icons"); Text("Uses monochrome icons when available on Android 13+", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }
+            Switch(settings.themedIcons, { onChange(settings.copy(themedIcons = it)) })
+        }
         Text("Icon size · ${settings.iconSize} dp")
         Slider(settings.iconSize.toFloat(), { onChange(settings.copy(iconSize = it.toInt())) }, valueRange = 32f..72f)
         Spacer(Modifier.height(16.dp))

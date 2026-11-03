@@ -4,6 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -53,6 +57,8 @@ private val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
 private val PALETTE = stringPreferencesKey("palette")
 private val FONT = stringPreferencesKey("font")
 private val CORNER_RADIUS = intPreferencesKey("corner_radius")
+private val ICON_SHAPE = stringPreferencesKey("icon_shape")
+private val THEMED_ICONS = booleanPreferencesKey("themed_icons")
 
 @Singleton
 class AndroidLauncherRepository @Inject constructor(
@@ -124,6 +130,7 @@ class AndroidLauncherRepository @Inject constructor(
             lockHidden = it[LOCK_HIDDEN] ?: false, themeMode = it[THEME_MODE] ?: "dark",
             dynamicColor = it[DYNAMIC_COLOR] ?: false, palette = it[PALETTE] ?: "violet",
             font = it[FONT] ?: "sans", cornerRadius = (it[CORNER_RADIUS] ?: 20).coerceIn(0, 32),
+            iconShape = it[ICON_SHAPE] ?: "circle", themedIcons = it[THEMED_ICONS] ?: false,
         )
     }
 
@@ -139,6 +146,8 @@ class AndroidLauncherRepository @Inject constructor(
             it[PALETTE] = settings.palette.takeIf { value -> value in setOf("violet", "cyan", "amber") } ?: "violet"
             it[FONT] = settings.font.takeIf { value -> value in setOf("sans", "serif", "mono") } ?: "sans"
             it[CORNER_RADIUS] = settings.cornerRadius.coerceIn(0, 32)
+            it[ICON_SHAPE] = settings.iconShape.takeIf { value -> value in setOf("circle", "squircle", "teardrop", "square") } ?: "circle"
+            it[THEMED_ICONS] = settings.themedIcons
         }
     }
 
@@ -183,14 +192,35 @@ class AndroidLauncherRepository @Inject constructor(
         } catch (_: SecurityException) { false } catch (_: android.content.ActivityNotFoundException) { false }
     }
 
-    suspend fun icon(app: LauncherApp, pixels: Int): Bitmap? = withContext(Dispatchers.IO) {
-        val cacheKey = "${app.key}:$pixels"
+    suspend fun icon(app: LauncherApp, pixels: Int, settings: LauncherSettings): Bitmap? = withContext(Dispatchers.IO) {
+        val cacheKey = "${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}"
         iconCache.get(cacheKey) ?: try {
             val profile = user(app.userSerial) ?: return@withContext null
             val info = launcher.getActivityList(app.packageName, profile).firstOrNull {
                 it.componentName.flattenToString() == app.componentName
             } ?: return@withContext null
-            info.getBadgedIcon(0).toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888).also { iconCache.put(cacheKey, it) }
+            val adaptive = if (Build.VERSION.SDK_INT >= 33 && settings.themedIcons && !app.isWorkProfile) info.getIcon(0) as? AdaptiveIconDrawable else null
+            val monochrome = if (Build.VERSION.SDK_INT >= 33) adaptive?.monochrome else null
+            val bitmap = if (monochrome != null) {
+                val dark = settings.themeMode != "light"
+                val color = if (settings.dynamicColor && Build.VERSION.SDK_INT >= 31) {
+                    context.getColor(if (dark) android.R.color.system_accent1_200 else android.R.color.system_accent1_700)
+                } else when (settings.palette) {
+                    "cyan" -> if (dark) Color.rgb(155, 232, 236) else Color.rgb(0, 105, 109)
+                    "amber" -> if (dark) Color.rgb(255, 214, 138) else Color.rgb(121, 89, 0)
+                    else -> if (dark) Color.rgb(187, 199, 255) else Color.rgb(68, 88, 165)
+                }
+                Bitmap.createBitmap(pixels, pixels, Bitmap.Config.ARGB_8888).also { result ->
+                    val canvas = Canvas(result)
+                    canvas.drawColor(if (dark) Color.rgb(35, 41, 57) else Color.rgb(232, 235, 248))
+                    val icon = (monochrome.constantState?.newDrawable() ?: monochrome).mutate()
+                    icon.setTint(color)
+                    val inset = pixels / 8
+                    icon.setBounds(inset, inset, pixels - inset, pixels - inset)
+                    icon.draw(canvas)
+                }
+            } else info.getBadgedIcon(0).toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
+            bitmap.also { iconCache.put(cacheKey, it) }
         } catch (_: SecurityException) { null }
     }
 }

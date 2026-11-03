@@ -28,6 +28,8 @@ data class LauncherSettings(
     val palette: String = "violet",
     val font: String = "sans",
     val cornerRadius: Int = 20,
+    val iconShape: String = "circle",
+    val themedIcons: Boolean = false,
 )
 
 interface LauncherRepository {

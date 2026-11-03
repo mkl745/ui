@@ -21,11 +21,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.orbit.launcher.core.domain.LauncherApp
+import com.orbit.launcher.core.domain.LauncherSettings
 import com.orbit.launcher.core.domain.searchApps
 import com.orbit.launcher.core.domain.quickAnswer
 
 @Composable
-fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, webSearch: Boolean, onWebSearch: (String) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
+fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQuery: String, webSearch: Boolean, onWebSearch: (String) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
     var query by remember { mutableStateOf(initialQuery) }
     val requester = remember { FocusRequester() }
     val clipboard = LocalClipboardManager.current
@@ -50,7 +51,7 @@ fun SearchScreen(apps: List<LauncherApp>, initialQuery: String, webSearch: Boole
         LazyColumn(Modifier.fillMaxSize()) {
             items(results, key = { it.key }) { app ->
                 val pixels = with(LocalDensity.current) { 40.dp.roundToPx() }
-                val icon by produceState<Bitmap?>(null, app.key, pixels) { value = loadIcon(app, pixels) }
+                val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor) { value = loadIcon(app, pixels) }
                 Row(Modifier.fillMaxWidth().clickable { onLaunch(app) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = null, modifier = Modifier.size(40.dp)) else Spacer(Modifier.size(40.dp))
                     Spacer(Modifier.width(16.dp))

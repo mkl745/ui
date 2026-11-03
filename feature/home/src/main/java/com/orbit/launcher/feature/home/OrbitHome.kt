@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -146,12 +147,18 @@ fun AppOrb(
 ) {
     val density = LocalDensity.current
     val pixels = with(density) { settings.iconSize.dp.roundToPx() }.coerceAtLeast(1)
-    val icon by produceState<Bitmap?>(null, app.key, pixels) { value = loadIcon(app, pixels) }
+    val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor) { value = loadIcon(app, pixels) }
+    val shape = when (settings.iconShape) {
+        "squircle" -> RoundedCornerShape(24)
+        "teardrop" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomStartPercent = 50, bottomEndPercent = 8)
+        "square" -> RoundedCornerShape(0)
+        else -> CircleShape
+    }
     Column(
         Modifier.width(76.dp).combinedClickable(onClickLabel = "Open ${app.label}", onLongClickLabel = "Actions for ${app.label}", onClick = { onLaunch(app) }, onLongClick = { onMenu(app) }),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(settings.iconSize.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(settings.iconSize.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
             if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = if (settings.showLabels) null else app.label, modifier = Modifier.fillMaxSize())
             else Text(app.label.take(1), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
