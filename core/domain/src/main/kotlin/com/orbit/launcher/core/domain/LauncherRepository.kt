@@ -17,6 +17,8 @@ data class LauncherApp(
     val groupName: String? = null,
 )
 
+data class ContactResult(val id: Long, val lookupKey: String, val label: String)
+
 data class LauncherSettings(
     val showLabels: Boolean = true,
     val reduceMotion: Boolean = false,
@@ -37,6 +39,7 @@ data class LauncherSettings(
     val doubleTap: String = "search",
     val emptyLongPress: String = "settings",
     val twoFinger: String = "none",
+    val contactSearch: Boolean = false,
 )
 
 interface LauncherRepository {

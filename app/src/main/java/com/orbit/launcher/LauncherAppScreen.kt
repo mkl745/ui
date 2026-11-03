@@ -1,5 +1,9 @@
 package com.orbit.launcher
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.provider.ContactsContract
+import androidx.core.content.ContextCompat
 import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import android.app.Activity
@@ -63,6 +67,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var hiddenUnlocked by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
+    var contactsRationale by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
@@ -117,6 +122,9 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             cancelPendingWidget(); Toast.makeText(context, "Widget binding denied", Toast.LENGTH_SHORT).show()
         }
     }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.settings(viewModel.settings.value.copy(contactSearch = granted))
+    }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val success = runCatching { viewModel.exportBackup(uri) }.isSuccess
@@ -167,6 +175,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             "search" -> SearchScreen(apps, settings, initialQuery, settings.webSearch, { query ->
                 try { context.startActivity(Intent(Intent.ACTION_WEB_SEARCH).putExtra(android.app.SearchManager.QUERY, query)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "No web search app available", Toast.LENGTH_SHORT).show() }
+            }, viewModel::contacts, { contact ->
+                val uri = ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)
+                try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "No contacts app available", Toast.LENGTH_SHORT).show() }
             }, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "groups" -> GroupsScreen(apps, settings, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
             "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
@@ -181,6 +193,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             }, {
                 try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Accessibility settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, { enabled ->
+                if (!enabled) viewModel.settings(settings.copy(contactSearch = false))
+                else if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) viewModel.settings(settings.copy(contactSearch = true))
+                else contactsRationale = true
             }, hiddenUnlocked, { authenticate { hiddenUnlocked = true } }, {
                 authenticate { viewModel.settings(settings.copy(lockHidden = !settings.lockHidden)); hiddenUnlocked = !settings.lockHidden }
             }, { screen = "home" })
@@ -188,6 +204,13 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         }
         }
     }
+    if (contactsRationale) AlertDialog(
+        onDismissRequest = { contactsRationale = false },
+        title = { Text("Search contacts") },
+        text = { Text("Orbit reads contact names on this device only when you search. Contacts are not stored or sent to a server. You can turn this off at any time.") },
+        confirmButton = { TextButton(onClick = { contactsRationale = false; contactsPermission.launch(Manifest.permission.READ_CONTACTS) }) { Text("Continue") } },
+        dismissButton = { TextButton(onClick = { contactsRationale = false }) { Text("Not now") } },
+    )
     selected?.let { app ->
         if (grouping) {
             AlertDialog(

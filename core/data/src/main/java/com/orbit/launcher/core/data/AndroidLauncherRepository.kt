@@ -66,6 +66,7 @@ private val SWIPE_RIGHT = stringPreferencesKey("swipe_right")
 private val DOUBLE_TAP = stringPreferencesKey("double_tap")
 private val EMPTY_LONG_PRESS = stringPreferencesKey("empty_long_press")
 private val TWO_FINGER = stringPreferencesKey("two_finger")
+private val CONTACT_SEARCH = booleanPreferencesKey("contact_search")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
@@ -143,6 +144,7 @@ class AndroidLauncherRepository @Inject constructor(
             swipeUp = it[SWIPE_UP] ?: "search", swipeDown = it[SWIPE_DOWN] ?: "notifications",
             swipeLeft = it[SWIPE_LEFT] ?: "none", swipeRight = it[SWIPE_RIGHT] ?: "none",
             doubleTap = it[DOUBLE_TAP] ?: "search", emptyLongPress = it[EMPTY_LONG_PRESS] ?: "settings", twoFinger = it[TWO_FINGER] ?: "none",
+            contactSearch = it[CONTACT_SEARCH] ?: false,
         )
     }
 
@@ -167,6 +169,7 @@ class AndroidLauncherRepository @Inject constructor(
             it[DOUBLE_TAP] = settings.doubleTap.takeIf { v -> v in gestureActions } ?: "none"
             it[EMPTY_LONG_PRESS] = settings.emptyLongPress.takeIf { v -> v in gestureActions } ?: "none"
             it[TWO_FINGER] = settings.twoFinger.takeIf { v -> v in gestureActions } ?: "none"
+            it[CONTACT_SEARCH] = settings.contactSearch
         }
     }
 
