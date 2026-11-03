@@ -1,5 +1,7 @@
 package com.orbit.launcher
 
+import android.accessibilityservice.AccessibilityService
+import android.os.Build
 import android.app.Activity
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
@@ -127,6 +129,23 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             Toast.makeText(context, if (success) "Backup restored" else "Invalid or unreadable backup", Toast.LENGTH_LONG).show()
         }
     }
+    fun performGesture(action: String) {
+        when (action) {
+            "search" -> { initialQuery = ""; screen = "search" }
+            "settings" -> screen = "settings"
+            "widgets" -> screen = "widgets"
+            "groups" -> screen = "groups"
+            "notifications", "quick_settings", "lock" -> {
+                val systemAction = when (action) {
+                    "notifications" -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+                    "quick_settings" -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+                    else -> if (Build.VERSION.SDK_INT >= 28) AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN else -1
+                }
+                if (systemAction == -1 || !GestureAccessibilityService.perform(systemAction))
+                    Toast.makeText(context, "Enable Orbit gesture accessibility in settings", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false; grouping = false }
     LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus(); if (screen != "settings") hiddenUnlocked = false }
     BackHandler(enabled = screen != "home" || selected != null) {
@@ -159,10 +178,13 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; restore.launch(arrayOf("application/json", "text/json")) } else restore.launch(arrayOf("application/json", "text/json")) }, {
                 try { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Notification settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, {
+                try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "Accessibility settings unavailable", Toast.LENGTH_SHORT).show() }
             }, hiddenUnlocked, { authenticate { hiddenUnlocked = true } }, {
                 authenticate { viewModel.settings(settings.copy(lockHidden = !settings.lockHidden)); hiddenUnlocked = !settings.lockHidden }
             }, { screen = "home" })
-            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" })
+            else -> OrbitHome(apps, settings, badgeCounts, viewModel::icon, viewModel::launch, { selected = it }, { initialQuery = ""; screen = "search" }, { screen = "settings" }, { screen = "widgets" }, { screen = "groups" }, ::performGesture)
         }
         }
     }

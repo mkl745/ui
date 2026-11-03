@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +58,7 @@ fun OrbitHome(
     onSettings: () -> Unit,
     onWidgets: () -> Unit,
     onGroups: () -> Unit,
+    onGesture: (String) -> Unit,
 ) {
     val orbitApps = remember(apps) {
         apps.filterNot { it.hidden || it.searchOnly }.sortedWith(compareByDescending<LauncherApp> { it.pinned }
@@ -64,6 +67,8 @@ fun OrbitHome(
     val rotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val latestGesture by rememberUpdatedState(onGesture)
+    var twoFingerActive by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
@@ -75,7 +80,26 @@ fun OrbitHome(
         Spacer(Modifier.weight(1f))
         BoxWithConstraints(
             Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 480.dp).aspectRatio(1f)
-                .pointerInput(settings.reduceMotion) {
+                .pointerInput(settings.doubleTap, settings.emptyLongPress) {
+                    detectTapGestures(onDoubleTap = { latestGesture(settings.doubleTap) }, onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        latestGesture(settings.emptyLongPress)
+                    })
+                }
+                .pointerInput(settings.twoFinger) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        twoFingerActive = false
+                        do {
+                            val event = awaitPointerEvent()
+                            if (!twoFingerActive && event.changes.count { it.pressed } >= 2) {
+                                twoFingerActive = true
+                                latestGesture(settings.twoFinger)
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
+                }
+                .pointerInput(settings.reduceMotion, settings.swipeUp, settings.swipeDown, settings.swipeLeft, settings.swipeRight) {
                     val tracker = VelocityTracker()
                     var dragX = 0f
                     var dragY = 0f
@@ -83,7 +107,14 @@ fun OrbitHome(
                         onDragStart = { tracker.resetTracking(); dragX = 0f; dragY = 0f; scope.launch { rotation.stop() } },
                         onDragEnd = {
                             val velocity = tracker.calculateVelocity().x / size.width.coerceAtLeast(1) * 360f
-                            if (dragY < -size.height * .16f && kotlin.math.abs(dragY) > kotlin.math.abs(dragX)) { onSearch(); return@detectDragGestures }
+                            if (twoFingerActive) return@detectDragGestures
+                            if (kotlin.math.abs(dragY) > size.height * .16f && kotlin.math.abs(dragY) > kotlin.math.abs(dragX)) {
+                                latestGesture(if (dragY < 0) settings.swipeUp else settings.swipeDown); return@detectDragGestures
+                            }
+                            if (kotlin.math.abs(dragX) > size.width * .4f) {
+                                val action = if (dragX < 0) settings.swipeLeft else settings.swipeRight
+                                if (action != "none") { latestGesture(action); return@detectDragGestures }
+                            }
                             if (!settings.reduceMotion) scope.launch {
                                 rotation.animateDecay(velocity.coerceIn(-720f, 720f), exponentialDecay(frictionMultiplier = 2.5f))
                             }
@@ -93,7 +124,7 @@ fun OrbitHome(
                             dragY += drag.y
                             tracker.addPosition(change.uptimeMillis, change.position)
                             change.consume()
-                            if (kotlin.math.abs(dragX) >= kotlin.math.abs(dragY)) scope.launch { rotation.snapTo(rotation.value + drag.x / size.width * 240f) }
+                            if (!twoFingerActive && kotlin.math.abs(dragX) >= kotlin.math.abs(dragY)) scope.launch { rotation.snapTo(rotation.value + drag.x / size.width * 240f) }
                         },
                     )
                 },
@@ -131,7 +162,7 @@ fun OrbitHome(
             ) { Text("⌕", fontSize = 34.sp, color = MaterialTheme.colorScheme.onPrimary) }
         }
         Spacer(Modifier.weight(1f))
-        Text("DRAG TO ROTATE  ·  SWIPE UP OR TAP TO SEARCH", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
+        Text("DRAG TO ROTATE  ·  TAP THE CENTER TO SEARCH", color = MaterialTheme.colorScheme.secondary, fontSize = 10.sp, textAlign = TextAlign.Center, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 20.dp))
         TextButton(onClick = onSearch, modifier = Modifier.padding(vertical = 16.dp)) { Text("ALL APPS  ↗") }
     }
 }

@@ -59,6 +59,14 @@ private val FONT = stringPreferencesKey("font")
 private val CORNER_RADIUS = intPreferencesKey("corner_radius")
 private val ICON_SHAPE = stringPreferencesKey("icon_shape")
 private val THEMED_ICONS = booleanPreferencesKey("themed_icons")
+private val SWIPE_UP = stringPreferencesKey("swipe_up")
+private val SWIPE_DOWN = stringPreferencesKey("swipe_down")
+private val SWIPE_LEFT = stringPreferencesKey("swipe_left")
+private val SWIPE_RIGHT = stringPreferencesKey("swipe_right")
+private val DOUBLE_TAP = stringPreferencesKey("double_tap")
+private val EMPTY_LONG_PRESS = stringPreferencesKey("empty_long_press")
+private val TWO_FINGER = stringPreferencesKey("two_finger")
+private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
 class AndroidLauncherRepository @Inject constructor(
@@ -132,6 +140,9 @@ class AndroidLauncherRepository @Inject constructor(
             dynamicColor = it[DYNAMIC_COLOR] ?: false, palette = it[PALETTE] ?: "violet",
             font = it[FONT] ?: "sans", cornerRadius = (it[CORNER_RADIUS] ?: 20).coerceIn(0, 32),
             iconShape = it[ICON_SHAPE] ?: "circle", themedIcons = it[THEMED_ICONS] ?: false,
+            swipeUp = it[SWIPE_UP] ?: "search", swipeDown = it[SWIPE_DOWN] ?: "notifications",
+            swipeLeft = it[SWIPE_LEFT] ?: "none", swipeRight = it[SWIPE_RIGHT] ?: "none",
+            doubleTap = it[DOUBLE_TAP] ?: "search", emptyLongPress = it[EMPTY_LONG_PRESS] ?: "settings", twoFinger = it[TWO_FINGER] ?: "none",
         )
     }
 
@@ -149,6 +160,13 @@ class AndroidLauncherRepository @Inject constructor(
             it[CORNER_RADIUS] = settings.cornerRadius.coerceIn(0, 32)
             it[ICON_SHAPE] = settings.iconShape.takeIf { value -> value in setOf("circle", "squircle", "teardrop", "square") } ?: "circle"
             it[THEMED_ICONS] = settings.themedIcons
+            it[SWIPE_UP] = settings.swipeUp.takeIf { v -> v in gestureActions } ?: "none"
+            it[SWIPE_DOWN] = settings.swipeDown.takeIf { v -> v in gestureActions } ?: "none"
+            it[SWIPE_LEFT] = settings.swipeLeft.takeIf { v -> v in gestureActions } ?: "none"
+            it[SWIPE_RIGHT] = settings.swipeRight.takeIf { v -> v in gestureActions } ?: "none"
+            it[DOUBLE_TAP] = settings.doubleTap.takeIf { v -> v in gestureActions } ?: "none"
+            it[EMPTY_LONG_PRESS] = settings.emptyLongPress.takeIf { v -> v in gestureActions } ?: "none"
+            it[TWO_FINGER] = settings.twoFinger.takeIf { v -> v in gestureActions } ?: "none"
         }
     }
 

@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -14,7 +16,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -72,6 +74,18 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
             Switch(settings.webSearch, { onChange(settings.copy(webSearch = it)) })
         }
         Spacer(Modifier.height(20.dp))
+        Text("Gestures", style = MaterialTheme.typography.titleMedium)
+        Text("Swipe left and right still rotate the rings when their action is None.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        GestureSetting("Swipe up", settings.swipeUp) { onChange(settings.copy(swipeUp = it)) }
+        GestureSetting("Swipe down", settings.swipeDown) { onChange(settings.copy(swipeDown = it)) }
+        GestureSetting("Swipe left", settings.swipeLeft) { onChange(settings.copy(swipeLeft = it)) }
+        GestureSetting("Swipe right", settings.swipeRight) { onChange(settings.copy(swipeRight = it)) }
+        GestureSetting("Double tap", settings.doubleTap) { onChange(settings.copy(doubleTap = it)) }
+        GestureSetting("Long press empty space", settings.emptyLongPress) { onChange(settings.copy(emptyLongPress = it)) }
+        GestureSetting("Two fingers", settings.twoFinger) { onChange(settings.copy(twoFinger = it)) }
+        Text("Notifications, quick settings and screen lock require the optional Orbit accessibility service. It does not read screen content.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        TextButton(onClick = onAccessibilitySettings) { Text("Manage gesture accessibility") }
+        Spacer(Modifier.height(16.dp))
         Text("Notification badges", style = MaterialTheme.typography.titleMedium)
         Text("Allow notification access to show counts. Orbit does not store notification contents.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         TextButton(onClick = onNotificationAccess) { Text("Manage notification access") }
@@ -102,6 +116,22 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(app.label, modifier = Modifier.weight(1f))
                 TextButton(onClick = { onUnhide(app) }) { Text("Unhide") }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun GestureSetting(label: String, value: String, onChange: (String) -> Unit) {
+    var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val actions = listOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, modifier = Modifier.weight(1f))
+        Box {
+            TextButton(onClick = { expanded = true }) { Text(value.replace('_', ' ')) }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                actions.forEach { action -> DropdownMenuItem(text = { Text(action.replace('_', ' ')) }, onClick = { expanded = false; onChange(action) }) }
             }
         }
     }

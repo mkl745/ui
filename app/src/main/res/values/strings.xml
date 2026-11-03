@@ -2,4 +2,6 @@
     <string name="app_name">Orbit</string>
     <string name="home_settings_unavailable">Home settings are unavailable on this device.</string>
     <string name="badge_service_name">Orbit notification badges</string>
+    <string name="accessibility_service_name">Orbit gesture actions</string>
+    <string name="accessibility_service_description">Enables your chosen gestures to open notifications, quick settings, or lock the screen. Orbit does not read screen content.</string>
 </resources>

@@ -30,6 +30,13 @@ data class LauncherSettings(
     val cornerRadius: Int = 20,
     val iconShape: String = "circle",
     val themedIcons: Boolean = false,
+    val swipeUp: String = "search",
+    val swipeDown: String = "notifications",
+    val swipeLeft: String = "none",
+    val swipeRight: String = "none",
+    val doubleTap: String = "search",
+    val emptyLongPress: String = "settings",
+    val twoFinger: String = "none",
 )
 
 interface LauncherRepository {
