@@ -27,6 +27,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Orbit"
         android:enableOnBackInvokedCallback="true">
+        <provider
+            android:name=".RestoredIconProvider"
+            android:authorities="${applicationId}.restored-icons"
+            android:exported="false" />
         <service
             android:name=".GestureAccessibilityService"
             android:label="@string/accessibility_service_name"

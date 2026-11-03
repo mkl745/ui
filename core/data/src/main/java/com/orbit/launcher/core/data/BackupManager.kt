@@ -5,6 +5,8 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.Process
+import android.os.UserManager
 import com.orbit.launcher.core.domain.LauncherRepository
 import com.orbit.launcher.core.domain.LauncherSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,20 +17,29 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Exports only Orbit-owned data, never icons or notification contents. */
+/** Explicit user-initiated export; never includes notifications or precise location. */
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AppPreferenceDao,
     private val repository: LauncherRepository,
     private val widgetDao: WidgetDao,
+    private val portableIcons: PortableIconStore,
 ) {
     suspend fun export(uri: Uri) = withContext(Dispatchers.IO) {
         val settings = repository.settings.first()
         val entries = JSONArray()
+        var encodedIconBytes = 0L
         dao.all().forEach { item ->
-            entries.put(JSONObject().put("key", item.key).put("pinned", item.pinned).put("hidden", item.hidden)
+            val entry = JSONObject().put("key", item.key).put("pinned", item.pinned).put("hidden", item.hidden)
                 .put("label", item.customLabel ?: JSONObject.NULL).put("launches", item.launches).put("lastLaunched", item.lastLaunched)
-                .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL).put("customIconUri", item.customIconUri ?: JSONObject.NULL))
+                .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL)
+            item.customIconUri?.let {
+                val encoded = portableIcons.snapshot(it)
+                encodedIconBytes += encoded.length
+                require(encodedIconBytes <= 24L * 1024 * 1024) { "Icon backups are too large" }
+                entry.put("customIconPng", encoded)
+            }
+            entries.put(entry)
         }
         val manager = AppWidgetManager.getInstance(context)
         val widgetEntries = JSONArray()
@@ -36,22 +47,31 @@ class BackupManager @Inject constructor(
             val provider = widget.providerName ?: manager.getAppWidgetInfo(widget.widgetId)?.provider?.flattenToString()
             if (provider != null) widgetEntries.put(JSONObject().put("provider", provider).put("heightDp", widget.heightDp).put("widthDp", widget.widthDp))
         }
-        val json = JSONObject().put("widgets", widgetEntries).put("version", 1).put("apps", entries).put("settings", JSONObject()
+        val personalSerial = context.getSystemService(UserManager::class.java).getSerialNumberForUser(Process.myUserHandle())
+        val json = JSONObject().put("widgets", widgetEntries).put("version", 2).put("personalSerial", personalSerial).put("apps", entries).put("settings", JSONObject()
             .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch)
             .put("themeMode", settings.themeMode).put("dynamicColor", settings.dynamicColor).put("palette", settings.palette)
             .put("font", settings.font).put("cornerRadius", settings.cornerRadius).put("iconShape", settings.iconShape).put("themedIcons", settings.themedIcons)
             .put("swipeUp", settings.swipeUp).put("swipeDown", settings.swipeDown).put("swipeLeft", settings.swipeLeft).put("swipeRight", settings.swipeRight)
             .put("doubleTap", settings.doubleTap).put("emptyLongPress", settings.emptyLongPress).put("twoFinger", settings.twoFinger).put("iconPack", settings.iconPack)
             .put("wallpaperEnabled", settings.wallpaperEnabled).put("wallpaperParallax", settings.wallpaperParallax).put("blurStrength", settings.blurStrength))
+        val payload = json.toString().toByteArray(Charsets.UTF_8)
+        require(payload.size <= 32 * 1024 * 1024) { "Backup is too large" }
         val stream = context.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open backup")
-        stream.bufferedWriter(Charsets.UTF_8).use { it.write(json.toString()) }
+        stream.use { it.write(payload) }
     }
 
     suspend fun restore(uri: Uri) = withContext(Dispatchers.IO) {
         val stream = context.contentResolver.openInputStream(uri) ?: error("Cannot open backup")
-        val bytes = stream.use { input -> input.readBytesLimited(1_048_576) }
+        val bytes = stream.use { input -> input.readBytesLimited(32 * 1024 * 1024) }
         val json = JSONObject(bytes.toString(Charsets.UTF_8))
-        require(json.getInt("version") == 1) { "Unsupported backup version" }
+        require(json.getInt("version") in 1..2) { "Unsupported backup version" }
+        val oldPersonalSerial = json.optLong("personalSerial", -1)
+        val currentSerial = context.getSystemService(UserManager::class.java).getSerialNumberForUser(Process.myUserHandle())
+        fun remapKey(key: String): String {
+            val prefix = "$oldPersonalSerial:"
+            return if (oldPersonalSerial >= 0 && currentSerial >= 0 && key.startsWith(prefix)) "$currentSerial:${key.removePrefix(prefix)}" else key
+        }
         val settingsJson = json.getJSONObject("settings")
         val iconSize = settingsJson.getInt("iconSize")
         require(iconSize in 32..72)
@@ -62,13 +82,18 @@ class BackupManager @Inject constructor(
         val iconShape = settingsJson.optString("iconShape", "circle")
         require(themeMode in setOf("system", "dark", "light", "amoled") && palette in setOf("violet", "cyan", "amber") && font in setOf("sans", "serif", "mono") && radius in 0..32 && iconShape in setOf("circle", "squircle", "teardrop", "square"))
         val allowedActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock", "torch")
-        fun action(name: String, default: String): String = settingsJson.optString(name, default).also { require(it in allowedActions || (it.startsWith("app:") && it.length in 5..1028)) }
+        fun action(name: String, default: String): String {
+            val value = settingsJson.optString(name, default)
+            require(value in allowedActions || (value.startsWith("app:") && value.length in 5..1028))
+            return if (value.startsWith("app:")) "app:${remapKey(value.removePrefix("app:"))}" else value
+        }
         val settings = LauncherSettings(settingsJson.getBoolean("showLabels"), settingsJson.getBoolean("reduceMotion"), iconSize, settingsJson.optBoolean("webSearch", false), repository.settings.first().lockHidden, themeMode, settingsJson.optBoolean("dynamicColor", false), palette, font, radius, iconShape, settingsJson.optBoolean("themedIcons", false), action("swipeUp", "search"), action("swipeDown", "notifications"), action("swipeLeft", "none"), action("swipeRight", "none"), action("doubleTap", "search"), action("emptyLongPress", "settings"), action("twoFinger", "none"), repository.settings.first().contactSearch, repository.settings.first().contextSuggestions, repository.settings.first().documentTree, settingsJson.optString("iconPack", "").also { require(it.length <= 255) }, settingsJson.optBoolean("wallpaperEnabled", false), settingsJson.optBoolean("wallpaperParallax", false), settingsJson.optInt("blurStrength", 20).also { require(it in 0..40) }, repository.settings.first().locationCategories, repository.settings.first().homeAnchor, repository.settings.first().workAnchor)
         val array = json.getJSONArray("apps")
         require(array.length() <= 10_000)
+        val iconSnapshots = mutableMapOf<String, ByteArray>()
         val entries = (0 until array.length()).map { index ->
             val item = array.getJSONObject(index)
-            val key = item.getString("key")
+            val key = remapKey(item.getString("key"))
             require(key.length in 1..1024)
             val label = if (item.isNull("label")) null else item.getString("label")
             require(label == null || label.length <= 1024)
@@ -79,6 +104,7 @@ class BackupManager @Inject constructor(
             require(group == null || group.length <= 60)
             val iconUri = if (!item.has("customIconUri") || item.isNull("customIconUri")) null else item.getString("customIconUri")
             require(iconUri == null || (iconUri.length <= 4096 && Uri.parse(iconUri).scheme == "content"))
+            if (item.has("customIconPng") && !item.isNull("customIconPng")) iconSnapshots[key] = portableIcons.validate(item.getString("customIconPng"))
             AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last, item.optBoolean("searchOnly", false), group, iconUri)
         }
         require(entries.map { it.key }.distinct().size == entries.size)
@@ -104,7 +130,11 @@ class BackupManager @Inject constructor(
             if (reusable != null) { remaining.remove(reusable); WidgetPlacement(reusable.widgetId, height, provider, width) }
             else WidgetPlacement(-2 - index, height, provider, width)
         }
-        dao.replaceAll(entries)
+        val restoredEntries = entries.map { entry ->
+            val icon = iconSnapshots[entry.key]
+            if (icon != null) entry.copy(customIconUri = portableIcons.save(icon)) else entry
+        }
+        dao.replaceAll(restoredEntries)
         if (restoredWidgets != null) {
             widgetDao.replaceAll(restoredWidgets)
             val host = AppWidgetHost(context, 1024)

@@ -142,7 +142,7 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPack
         TextButton(onClick = onNotificationAccess) { Text("Manage notification access") }
         Spacer(Modifier.height(16.dp))
         Text("Backup", style = MaterialTheme.typography.titleMedium)
-        Text("Save or restore app preferences and settings as JSON. Profile identifiers may differ on another device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        Text("Save or restore app preferences, widget layout and resized custom-icon images as JSON. Work profile IDs may differ on another device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         Row { TextButton(onClick = onExport) { Text("Export") }; TextButton(onClick = onRestore) { Text("Restore") } }
         val searchOnly = apps.filter { it.searchOnly && !it.hidden }.sortedBy { it.label.lowercase() }
         Spacer(Modifier.height(16.dp))
