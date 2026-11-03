@@ -7,10 +7,10 @@ Orbit is an Android launcher in active development, built with Kotlin, Compose, 
 Use JDK 17 and Android SDK Platform / Build Tools 35. Open the project in Android Studio or set `ANDROID_HOME` / `local.properties`. For example:
 
 ```sh
-./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :baselineprofile:assemble :app:lintDebug :core:domain:test
+./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :baselineprofile:assembleBenchmarkRelease :app:lintDebug :core:domain:test
 ```
 
-GitHub Actions performs builds and domain tests on pushes, uploads a debug APK on success, and runs the Compose instrumentation tests on an API 35 emulator. `:baselineprofile` contains a baseline profile generator and a cold-start Macrobenchmark. Generate profiles on a compatible connected device with `./gradlew :app:generateBaselineProfile`; benchmark results are device-specific. No cold-start or frame-rate target has been verified. Ktlint and detekt are configured as Gradle tasks, but a clean result is not yet claimed.
+GitHub Actions performs builds and domain tests on pushes, uploads a debug APK on success, and provides a manually triggered API 35 emulator job for Compose instrumentation tests. `:baselineprofile` contains a baseline profile generator and a cold-start Macrobenchmark. Generate profiles on a compatible connected device with `./gradlew :app:generateBaselineProfile`; benchmark results are device-specific. No cold-start or frame-rate target has been verified. Ktlint and detekt are configured as Gradle tasks, but a clean result is not yet claimed.
 
 The app offers the Android home role on Android 10+ or opens system home settings on Android 8–9. Skipping the prompt does not change the default. HOME intents return to the home surface. Release builds use R8/resource shrinking and are unsigned unless signing is configured by the developer outside this repository.
 

@@ -2,6 +2,7 @@ name: Android build
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +23,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :baselineprofile:assemble :app:lintDebug :core:domain:test 2>&1 | tee "$RUNNER_TEMP/gradle-output.txt"
+          ./gradlew :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest :baselineprofile:assembleBenchmarkRelease :app:lintDebug :core:domain:test 2>&1 | tee "$RUNNER_TEMP/gradle-output.txt"
       - name: Publish build diagnostics
         if: steps.build.outcome == 'failure' && github.event_name == 'push'
         env:
@@ -46,6 +47,7 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
   ui-tests:
+    if: github.event_name == 'workflow_dispatch'
     needs: debug
     runs-on: ubuntu-latest
     timeout-minutes: 25
