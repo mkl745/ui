@@ -15,5 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "OrbitLauncher"
+include(":baselineprofile")
 include(":app", ":core:ui", ":core:data", ":core:domain")
 include(":feature:home", ":feature:drawer", ":feature:search", ":feature:settings")

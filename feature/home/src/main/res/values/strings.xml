@@ -2,8 +2,8 @@
     <string name="orbit_wordmark">O R B I T</string>
     <string name="setup_eyebrow">A DIFFERENT KIND OF HOME</string>
     <string name="setup_title">Make space for what matters.</string>
-    <string name="setup_description">Orbit is being built as a radial launcher. Set it as your home app when you are ready to try it.</string>
-    <string name="setup_warning">This early foundation does not yet show or launch apps. You can change your home app again in system settings.</string>
+    <string name="setup_description">Orbit brings your apps, search, and widgets into an orbital home. Set it as your home app when you are ready.</string>
+    <string name="setup_warning">Orbit is still under development. Keep another launcher installed; you can change your home app again in system settings.</string>
     <string name="choose_home">Choose default home app</string>
     <string name="continue_later">Continue without changing</string>
     <string name="home_eyebrow">YOUR HOME, REIMAGINED</string>

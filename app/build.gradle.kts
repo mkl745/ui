@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.baselineprofile)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
@@ -41,6 +42,8 @@ dependencies {
     implementation(project(":feature:drawer"))
     implementation(project(":feature:search"))
     implementation(project(":feature:settings"))
+    baselineProfile(project(":baselineprofile"))
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.activity.compose)
@@ -63,3 +66,5 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 }
+
+baselineProfile { automaticGenerationDuringBuild = false }

@@ -22,7 +22,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :core:domain:test 2>&1 | tee "$RUNNER_TEMP/gradle-output.txt"
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :baselineprofile:assemble :core:domain:test 2>&1 | tee "$RUNNER_TEMP/gradle-output.txt"
       - name: Publish build diagnostics
         if: steps.build.outcome == 'failure' && github.event_name == 'push'
         env:
