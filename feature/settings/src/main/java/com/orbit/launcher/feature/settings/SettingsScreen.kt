@@ -16,7 +16,7 @@ import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
 
 @Composable
-fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange: (LauncherSettings) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onUnhide: (LauncherApp) -> Unit, onShowInOrbit: (LauncherApp) -> Unit, onExport: () -> Unit, onRestore: () -> Unit, onNotificationAccess: () -> Unit, onAccessibilitySettings: () -> Unit, onUsageAccess: () -> Unit, onChooseFolder: () -> Unit, onClearFolder: () -> Unit, onContactsChange: (Boolean) -> Unit, hiddenUnlocked: Boolean, onUnlockHidden: () -> Unit, onToggleHiddenLock: () -> Unit, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
         TextButton(onClick = onBack) { Text("Back") }
         Text("Your orbit", style = MaterialTheme.typography.headlineLarge)
@@ -68,6 +68,13 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, onChange
         }
         Text("Icon size · ${settings.iconSize} dp")
         Slider(settings.iconSize.toFloat(), { onChange(settings.copy(iconSize = it.toInt())) }, valueRange = 32f..72f)
+        Spacer(Modifier.height(16.dp))
+        Text("File search", style = MaterialTheme.typography.titleMedium)
+        Text(if (settings.documentTree.isBlank()) "Choose a folder to show recent files and search names on this device." else "A folder is available to search. Only its direct files are listed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        Row {
+            TextButton(onClick = onChooseFolder) { Text(if (settings.documentTree.isBlank()) "Choose folder" else "Change folder") }
+            if (settings.documentTree.isNotBlank()) TextButton(onClick = onClearFolder) { Text("Remove access") }
+        }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) { Text("Contacts search"); Text("Find contacts on this device; requires contacts permission", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary) }

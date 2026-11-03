@@ -29,6 +29,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.orbit.launcher.core.domain.SearchShortcut
 import com.orbit.launcher.core.domain.CurrentContext
 import com.orbit.launcher.core.domain.UsageContext
 import com.orbit.launcher.core.domain.rankContextApps
@@ -82,6 +83,7 @@ private val EMPTY_LONG_PRESS = stringPreferencesKey("empty_long_press")
 private val TWO_FINGER = stringPreferencesKey("two_finger")
 private val CONTACT_SEARCH = booleanPreferencesKey("contact_search")
 private val CONTEXT_SUGGESTIONS = booleanPreferencesKey("context_suggestions")
+private val DOCUMENT_TREE = stringPreferencesKey("document_tree")
 private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
 
 @Singleton
@@ -162,6 +164,7 @@ class AndroidLauncherRepository @Inject constructor(
             doubleTap = it[DOUBLE_TAP] ?: "search", emptyLongPress = it[EMPTY_LONG_PRESS] ?: "settings", twoFinger = it[TWO_FINGER] ?: "none",
             contactSearch = it[CONTACT_SEARCH] ?: false,
             contextSuggestions = it[CONTEXT_SUGGESTIONS] ?: false,
+            documentTree = it[DOCUMENT_TREE] ?: "",
         )
     }
 
@@ -190,6 +193,7 @@ class AndroidLauncherRepository @Inject constructor(
             it[TWO_FINGER] = settings.twoFinger.takeIf { v -> v in gestureActions } ?: "none"
             it[CONTACT_SEARCH] = settings.contactSearch
             it[CONTEXT_SUGGESTIONS] = settings.contextSuggestions
+            it[DOCUMENT_TREE] = settings.documentTree
         }
         if (clearHistory) usageDao.clear()
     }
@@ -281,6 +285,26 @@ class AndroidLauncherRepository @Inject constructor(
             )
             launcher.getShortcuts(query, profile).orEmpty().map { AppShortcut(it.id, (it.shortLabel ?: it.id).toString()) }
         } catch (_: SecurityException) { emptyList() } catch (_: IllegalStateException) { emptyList() }
+    }
+
+    suspend fun searchShortcuts(query: String, apps: List<LauncherApp>): List<SearchShortcut> = withContext(Dispatchers.IO) {
+        val text = query.trim()
+        if (text.length < 2 || !launcher.hasShortcutHostPermission()) return@withContext emptyList()
+        val byProfilePackage = apps.filterNot { it.hidden }.groupBy { it.userSerial to it.packageName }
+        val matches = mutableListOf<SearchShortcut>()
+        users.userProfiles.forEach { profile ->
+            try {
+                val serial = users.getSerialNumberForUser(profile)
+                val queryFlags = LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                val request = LauncherApps.ShortcutQuery().setQueryFlags(queryFlags)
+                launcher.getShortcuts(request, profile).orEmpty().forEach { shortcut ->
+                    val label = shortcut.shortLabel?.toString() ?: return@forEach
+                    val app = byProfilePackage[serial to shortcut.`package`]?.firstOrNull() ?: return@forEach
+                    if (label.contains(text, ignoreCase = true) && matches.size < 20) matches.add(SearchShortcut(app, shortcut.id, label))
+                }
+            } catch (_: SecurityException) { } catch (_: IllegalStateException) { }
+        }
+        matches.sortedBy { it.label.lowercase() }
     }
 
     fun launchShortcut(app: LauncherApp, id: String): Boolean {

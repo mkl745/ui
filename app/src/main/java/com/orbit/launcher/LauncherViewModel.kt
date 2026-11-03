@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
+import android.provider.DocumentsContract
+import com.orbit.launcher.core.domain.DocumentResult
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.orbit.launcher.core.domain.ContactResult
@@ -62,6 +64,28 @@ class LauncherViewModel @Inject constructor(
                     results.add(ContactResult(cursor.getLong(0), key, name))
                 }
                 results
+            } ?: emptyList()
+        } catch (_: SecurityException) { emptyList() } catch (_: IllegalArgumentException) { emptyList() }
+    }
+    suspend fun searchShortcuts(query: String) = androidRepository.searchShortcuts(query, apps.value)
+    suspend fun documents(query: String): List<DocumentResult> = withContext(Dispatchers.IO) {
+        val tree = settings.value.documentTree.takeIf { it.isNotBlank() } ?: return@withContext emptyList()
+        try {
+            val uri = Uri.parse(tree)
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(uri, DocumentsContract.getTreeDocumentId(uri))
+            val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            context.contentResolver.query(children, columns, null, null, null)?.use { cursor ->
+                val results = mutableListOf<DocumentResult>()
+                var scanned = 0
+                while (cursor.moveToNext() && scanned++ < 1000) {
+                    val id = cursor.getString(0) ?: continue
+                    val name = cursor.getString(1) ?: continue
+                    val type = cursor.getString(2) ?: "application/octet-stream"
+                    if (type != DocumentsContract.Document.MIME_TYPE_DIR && name.contains(query.trim(), ignoreCase = true)) {
+                        results.add(DocumentResult(DocumentsContract.buildDocumentUriUsingTree(uri, id).toString(), name, type, cursor.getLong(3)))
+                    }
+                }
+                results.sortedByDescending { it.lastModified }.take(20)
             } ?: emptyList()
         } catch (_: SecurityException) { emptyList() } catch (_: IllegalArgumentException) { emptyList() }
     }

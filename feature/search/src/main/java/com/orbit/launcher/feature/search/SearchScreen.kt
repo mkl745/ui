@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.orbit.launcher.core.domain.ContactResult
+import com.orbit.launcher.core.domain.DocumentResult
+import com.orbit.launcher.core.domain.SearchShortcut
 import kotlinx.coroutines.delay
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.core.domain.LauncherSettings
@@ -28,13 +30,19 @@ import com.orbit.launcher.core.domain.searchApps
 import com.orbit.launcher.core.domain.quickAnswer
 
 @Composable
-fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQuery: String, webSearch: Boolean, onWebSearch: (String) -> Unit, loadContacts: suspend (String) -> List<ContactResult>, onContact: (ContactResult) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
+fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQuery: String, webSearch: Boolean, onWebSearch: (String) -> Unit, loadContacts: suspend (String) -> List<ContactResult>, onContact: (ContactResult) -> Unit, loadDocuments: suspend (String) -> List<DocumentResult>, onDocument: (DocumentResult) -> Unit, loadShortcuts: suspend (String) -> List<SearchShortcut>, onShortcut: (SearchShortcut) -> Unit, loadIcon: suspend (LauncherApp, Int) -> Bitmap?, onLaunch: (LauncherApp) -> Unit, onBack: () -> Unit) {
     var query by remember { mutableStateOf(initialQuery) }
     val requester = remember { FocusRequester() }
     val clipboard = LocalClipboardManager.current
     val answer = remember(query) { quickAnswer(query) }
     val contacts by produceState(emptyList<ContactResult>(), query, settings.contactSearch) {
         if (settings.contactSearch && query.trim().length >= 2) { delay(200); value = loadContacts(query) }
+    }
+    val documents by produceState(emptyList<DocumentResult>(), query, settings.documentTree) {
+        if (settings.documentTree.isNotBlank()) { delay(200); value = loadDocuments(query) }
+    }
+    val shortcuts by produceState(emptyList<SearchShortcut>(), query, apps) {
+        if (query.trim().length >= 2) { delay(200); value = loadShortcuts(query) }
     }
     val results = remember(apps, query) { searchApps(apps.filterNot { it.hidden }, query) }
     LaunchedEffect(Unit) { requester.requestFocus() }
@@ -52,12 +60,24 @@ fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQue
         if (webSearch && query.isNotBlank()) TextButton(onClick = { onWebSearch(query) }, modifier = Modifier.fillMaxWidth()) { Text("Search the web ↗") }
         Spacer(Modifier.height(12.dp))
         Text("${results.size} apps", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-        if (results.isEmpty() && contacts.isEmpty() && answer == null) Text("No matching apps or contacts", modifier = Modifier.padding(top = 24.dp), color = MaterialTheme.colorScheme.secondary)
+        if (results.isEmpty() && contacts.isEmpty() && documents.isEmpty() && shortcuts.isEmpty() && answer == null) Text("No matching apps or contacts", modifier = Modifier.padding(top = 24.dp), color = MaterialTheme.colorScheme.secondary)
         LazyColumn(Modifier.fillMaxSize()) {
             if (contacts.isNotEmpty()) item { Text("CONTACTS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
             items(contacts, key = { "contact:${it.id}" }) { contact ->
                 Row(Modifier.fillMaxWidth().clickable { onContact(contact) }.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(contact.label, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            if (shortcuts.isNotEmpty()) item { Text("SHORTCUTS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
+            items(shortcuts, key = { "shortcut:${it.app.key}:${it.id}" }) { shortcut ->
+                Column(Modifier.fillMaxWidth().clickable { onShortcut(shortcut) }.padding(vertical = 10.dp)) {
+                    Text(shortcut.label); Text(shortcut.app.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+            if (documents.isNotEmpty()) item { Text("RECENT FILES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
+            items(documents, key = { "document:${it.uri}" }) { document ->
+                Column(Modifier.fillMaxWidth().clickable { onDocument(document) }.padding(vertical = 10.dp)) {
+                    Text(document.name); Text(document.mimeType, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                 }
             }
             if (results.isNotEmpty()) item { Text("APPS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }

@@ -17,6 +17,9 @@ data class LauncherApp(
     val groupName: String? = null,
 )
 
+data class SearchShortcut(val app: LauncherApp, val id: String, val label: String)
+data class DocumentResult(val uri: String, val name: String, val mimeType: String, val lastModified: Long)
+
 data class ContactResult(val id: Long, val lookupKey: String, val label: String)
 
 data class LauncherSettings(
@@ -41,6 +44,7 @@ data class LauncherSettings(
     val twoFinger: String = "none",
     val contactSearch: Boolean = false,
     val contextSuggestions: Boolean = false,
+    val documentTree: String = "",
 )
 
 interface LauncherRepository {

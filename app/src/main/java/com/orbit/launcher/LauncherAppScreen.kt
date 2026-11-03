@@ -126,6 +126,18 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.settings(viewModel.settings.value.copy(contactSearch = granted))
     }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val old = viewModel.settings.value.documentTree
+                if (old.isNotBlank() && old != uri.toString()) {
+                    try { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) { }
+                }
+                viewModel.settings(viewModel.settings.value.copy(documentTree = uri.toString()))
+            } catch (_: SecurityException) { Toast.makeText(context, "Could not keep folder access", Toast.LENGTH_SHORT).show() }
+        }
+    }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val success = runCatching { viewModel.exportBackup(uri) }.isSuccess
@@ -180,6 +192,12 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 val uri = ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)
                 try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "No contacts app available", Toast.LENGTH_SHORT).show() }
+            }, viewModel::documents, { document ->
+                try { context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(document.uri), document.mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
+                catch (_: ActivityNotFoundException) { Toast.makeText(context, "No app can open this file", Toast.LENGTH_SHORT).show() }
+                catch (_: SecurityException) { Toast.makeText(context, "File access was revoked", Toast.LENGTH_SHORT).show() }
+            }, viewModel::searchShortcuts, { shortcut ->
+                if (!viewModel.launchShortcut(shortcut.app, shortcut.id)) Toast.makeText(context, "Shortcut unavailable", Toast.LENGTH_SHORT).show()
             }, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "groups" -> GroupsScreen(apps, settings, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
             "widgets" -> WidgetScreen(widgetHost, widgets, ::addWidget,
@@ -197,6 +215,10 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             }, {
                 try { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 catch (_: ActivityNotFoundException) { Toast.makeText(context, "Usage settings unavailable", Toast.LENGTH_SHORT).show() }
+            }, { folderPicker.launch(null) }, {
+                val old = settings.documentTree
+                if (old.isNotBlank()) try { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) { }
+                viewModel.settings(settings.copy(documentTree = ""))
             }, { enabled ->
                 if (!enabled) viewModel.settings(settings.copy(contactSearch = false))
                 else if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) viewModel.settings(settings.copy(contactSearch = true))
