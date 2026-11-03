@@ -10,6 +10,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import com.orbit.launcher.core.domain.LauncherApp
 import com.orbit.launcher.feature.home.OrbitHome
@@ -37,6 +39,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
     var newName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val homeFocus = remember { FocusRequester() }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val success = runCatching { viewModel.exportBackup(uri) }.isSuccess
@@ -50,6 +53,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
         }
     }
     LaunchedEffect(homeRequests) { screen = "home"; selected = null; renaming = false }
+    LaunchedEffect(screen) { if (screen == "home") homeFocus.requestFocus() }
     BackHandler(enabled = screen != "home" || selected != null) {
         if (selected != null) { selected = null; renaming = false } else screen = "home"
     }
@@ -60,7 +64,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int) {
             screen = "search"
             true
         } else false
-    }) {
+    }.focusRequester(homeFocus).focusable()) {
         when (screen) {
             "search" -> SearchScreen(apps, initialQuery, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "settings" -> SettingsScreen(settings, apps, viewModel::settings, viewModel::icon, viewModel::hide, { export.launch("orbit-backup.json") }, { restore.launch(arrayOf("application/json", "text/json")) }, {
