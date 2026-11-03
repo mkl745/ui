@@ -63,11 +63,10 @@ import com.orbit.launcher.feature.settings.SettingsScreen
 fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHost: AppWidgetHost, authenticate: (() -> Unit) -> Unit, onBlur: (Int) -> Unit) {
     val apps by viewModel.apps.collectAsState()
     val settings by viewModel.settings.collectAsState()
-    val widgets by viewModel.widgets.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
-    val packs by produceState(emptyList<com.orbit.launcher.core.domain.IconPack>()) { value = viewModel.installedIconPacks() }
     val badgeCounts by NotificationBadges.badgeCounts.collectAsState()
     var screen by rememberSaveable { mutableStateOf("home") }
+    val packs by produceState(emptyList<com.orbit.launcher.core.domain.IconPack>(), screen) { if (screen == "settings") value = viewModel.installedIconPacks() }
     var initialQuery by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<LauncherApp?>(null) }
     var renaming by remember { mutableStateOf(false) }
@@ -83,13 +82,14 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
     val cameraManager = remember { context.getSystemService(CameraManager::class.java) }
-    DisposableEffect(cameraManager) {
+    val torchConfigured = listOf(settings.swipeUp, settings.swipeDown, settings.swipeLeft, settings.swipeRight, settings.doubleTap, settings.emptyLongPress, settings.twoFinger).contains("torch")
+    DisposableEffect(cameraManager, torchConfigured) {
         val callback = object : CameraManager.TorchCallback() {
             override fun onTorchModeChanged(cameraId: String, enabled: Boolean) { torchStates[cameraId] = enabled }
             override fun onTorchModeUnavailable(cameraId: String) { torchStates.remove(cameraId) }
         }
-        try { cameraManager.registerTorchCallback(callback, Handler(Looper.getMainLooper())) } catch (_: SecurityException) { }
-        onDispose { cameraManager.unregisterTorchCallback(callback) }
+        if (torchConfigured) try { cameraManager.registerTorchCallback(callback, Handler(Looper.getMainLooper())) } catch (_: SecurityException) { }
+        onDispose { if (torchConfigured) cameraManager.unregisterTorchCallback(callback) }
     }
     fun toggleTorch() {
         try {
@@ -261,11 +261,14 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                 if (!viewModel.launchShortcut(shortcut.app, shortcut.id)) Toast.makeText(context, "Shortcut unavailable", Toast.LENGTH_SHORT).show()
             }, viewModel::icon, { viewModel.launch(it); screen = "home" }, { screen = "home" })
             "groups" -> GroupsScreen(apps, settings, viewModel::icon, viewModel::launch, { selected = it }, { screen = "home" })
-            "widgets" -> WidgetScreen(widgetHost, widgets, { addWidget(it) },
-                { widget, height -> viewModel.putWidget(widget.widgetId, height, widget.providerName) },
-                { widget -> viewModel.removeWidget(widget.widgetId); if (widget.widgetId >= 0) widgetHost.deleteAppWidgetId(widget.widgetId) },
-                { widget, provider -> addWidget(provider, widget) },
-                { screen = "home" })
+            "widgets" -> {
+                val widgets by viewModel.widgets.collectAsState()
+                WidgetScreen(widgetHost, widgets, { addWidget(it) },
+                    { widget, height -> viewModel.putWidget(widget.widgetId, height, widget.providerName) },
+                    { widget -> viewModel.removeWidget(widget.widgetId); if (widget.widgetId >= 0) widgetHost.deleteAppWidgetId(widget.widgetId) },
+                    { widget, provider -> addWidget(provider, widget) },
+                    { screen = "home" })
+            }
             "settings" -> SettingsScreen(settings, apps, packs, viewModel::settings, viewModel::icon, viewModel::hide, viewModel::searchOnly,
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; export.launch("orbit-backup.json") } else export.launch("orbit-backup.json") },
                 { if (settings.lockHidden && !hiddenUnlocked) authenticate { hiddenUnlocked = true; restore.launch(arrayOf("application/json", "text/json")) } else restore.launch(arrayOf("application/json", "text/json")) }, {

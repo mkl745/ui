@@ -51,6 +51,11 @@ import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,6 +110,7 @@ class AndroidLauncherRepository @Inject constructor(
     private val launcher = context.getSystemService(LauncherApps::class.java)
     private val users = context.getSystemService(UserManager::class.java)
     private val updateLock = Mutex()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val iconCache = object : LruCache<String, Bitmap>(16 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
@@ -171,7 +177,7 @@ class AndroidLauncherRepository @Inject constructor(
                 customIconUri = preference?.customIconUri,
             )
         }
-    }
+    }.stateIn(repositoryScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     override val settings = context.launcherSettings.data.map {
         LauncherSettings(
@@ -268,10 +274,10 @@ class AndroidLauncherRepository @Inject constructor(
         } catch (_: SecurityException) { emptyList() }
     }
 
-    override val suggestedApps: Flow<List<LauncherApp>> = combine(apps, usageDao.observeRecent(), settings, suggestionRefresh) { appList, entries, prefs, _ ->
-        Triple(appList, entries, prefs)
-    }.map { (appList, entries, prefs) ->
-        if (!prefs.contextSuggestions) emptyList() else {
+    override val suggestedApps: Flow<List<LauncherApp>> = combine(apps, usageDao.observeRecent(), settings.map { it.contextSuggestions }.distinctUntilChanged(), suggestionRefresh) { appList, entries, enabled, _ ->
+        Triple(appList, entries, enabled)
+    }.map { (appList, entries, enabled) ->
+        if (!enabled) emptyList() else {
             val local = entries.map { UsageContext(it.appKey, it.hour, it.weekday, it.charging, it.headphones, it.timestamp) }
             rankContextApps(appList, local + systemUsage(appList), currentContext(), System.currentTimeMillis()).take(6)
         }
