@@ -343,7 +343,7 @@ class AndroidLauncherRepository @Inject constructor(
         @Suppress("DEPRECATION")
         val packUpdatedAt = if (settings.iconPack.isBlank()) 0L else try { context.packageManager.getPackageInfo(settings.iconPack, 0).lastUpdateTime } catch (_: android.content.pm.PackageManager.NameNotFoundException) { 0L }
         val cacheKey = "${app.customIconUri}:${settings.iconPack}:$packUpdatedAt:${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
-        iconCache.get(cacheKey) ?: (if (updatedAt != 0L) diskCache.read(cacheKey, pixels) else null)?.also { iconCache.put(cacheKey, it) } ?: try {
+        iconCache.get(cacheKey) ?: (if (updatedAt != 0L && app.customIconUri == null) diskCache.read(cacheKey, pixels) else null)?.also { iconCache.put(cacheKey, it) } ?: try {
             val profile = user(app.userSerial) ?: return@withContext null
             val info = launcher.getActivityList(app.packageName, profile).firstOrNull {
                 it.componentName.flattenToString() == app.componentName
@@ -380,22 +380,25 @@ class AndroidLauncherRepository @Inject constructor(
                     icon.draw(canvas)
                 }
             } else info.getBadgedIcon(0).toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
-            bitmap.also { iconCache.put(cacheKey, it); if (updatedAt != 0L) diskCache.write(cacheKey, it) }
+            bitmap.also { iconCache.put(cacheKey, it); if (updatedAt != 0L && app.customIconUri == null) diskCache.write(cacheKey, it) }
         } catch (_: SecurityException) { null }
     }
 
-    private fun loadCustomIcon(value: String, pixels: Int): Bitmap? = try {
+    private fun loadCustomIcon(value: String, pixels: Int): Bitmap? {
+      return try {
         val uri = Uri.parse(value)
         if (uri.scheme != "content") return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        val input = context.contentResolver.openInputStream(uri) ?: return null
+        input.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth !in 1..16384 || bounds.outHeight !in 1..16384) return null
         var sample = 1
         while (bounds.outWidth / sample > pixels * 2 || bounds.outHeight / sample > pixels * 2) sample *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
         Bitmap.createScaledBitmap(bitmap, pixels, pixels, true)
-    } catch (_: Exception) { null }
+      } catch (_: Exception) { null }
+    }
 }
 
 @Module
