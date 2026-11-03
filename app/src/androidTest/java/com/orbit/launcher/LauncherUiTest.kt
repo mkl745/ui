@@ -26,7 +26,7 @@ class LauncherUiTest {
         var skipped = false
         compose.setContent { OrbitTheme { LauncherFoundationScreen(false, 0, onChooseDefault = {}, onContinue = { skipped = true }) } }
         compose.onNodeWithText("Continue without changing").performClick()
-        assertTrue(skipped)
+        compose.runOnIdle { assertTrue(skipped) }
     }
 
     @Test fun hubOpensSearchAndFindsApp() {
