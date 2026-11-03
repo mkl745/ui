@@ -19,6 +19,7 @@ import com.orbit.launcher.core.ui.OrbitTheme
 import com.orbit.launcher.feature.home.LauncherFoundationScreen
 import com.orbit.launcher.feature.home.OrbitHome
 import com.orbit.launcher.feature.search.SearchScreen
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -36,7 +37,8 @@ class LauncherUiTest {
             }
         }
         compose.onNodeWithText("Continue without changing").performClick()
-        compose.onNodeWithText("Launcher ready").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(skipped) }
+        compose.onNodeWithText("Launcher ready").assertExists()
     }
 
     @Test fun hubOpensSearchAndFindsApp() {
