@@ -1,6 +1,11 @@
 package com.orbit.launcher
 
 import android.Manifest
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.os.Handler
+import android.os.Looper
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
@@ -71,10 +76,35 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     var contactsRationale by remember { mutableStateOf(false) }
+    var torchRationale by remember { mutableStateOf(false) }
+    val torchStates = remember { mutableStateMapOf<String, Boolean>() }
     var pendingIconKey by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
+    val cameraManager = remember { context.getSystemService(CameraManager::class.java) }
+    DisposableEffect(cameraManager) {
+        val callback = object : CameraManager.TorchCallback() {
+            override fun onTorchModeChanged(cameraId: String, enabled: Boolean) { torchStates[cameraId] = enabled }
+            override fun onTorchModeUnavailable(cameraId: String) { torchStates.remove(cameraId) }
+        }
+        try { cameraManager.registerTorchCallback(callback, Handler(Looper.getMainLooper())) } catch (_: SecurityException) { }
+        onDispose { cameraManager.unregisterTorchCallback(callback) }
+    }
+    fun toggleTorch() {
+        try {
+            val id = cameraManager.cameraIdList.firstOrNull { cameraId ->
+                val info = cameraManager.getCameraCharacteristics(cameraId)
+                info.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true && info.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+            }
+            if (id == null) { Toast.makeText(context, "No torch available", Toast.LENGTH_SHORT).show(); return }
+            cameraManager.setTorchMode(id, torchStates[id] != true)
+        } catch (_: CameraAccessException) { Toast.makeText(context, "Torch unavailable", Toast.LENGTH_SHORT).show() }
+        catch (_: SecurityException) { Toast.makeText(context, "Camera permission required", Toast.LENGTH_SHORT).show() }
+    }
+    val torchPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) toggleTorch() else Toast.makeText(context, "Camera permission not granted", Toast.LENGTH_SHORT).show()
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) hiddenUnlocked = false }
@@ -172,12 +202,19 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         }
     }
     fun performGesture(action: String) {
-        when (action) {
-            "search" -> { initialQuery = ""; screen = "search" }
-            "settings" -> screen = "settings"
-            "widgets" -> screen = "widgets"
-            "groups" -> screen = "groups"
-            "notifications", "quick_settings", "lock" -> {
+        when {
+            action.startsWith("app:") -> {
+                val app = apps.firstOrNull { it.key == action.removePrefix("app:") && !it.hidden }
+                if (app != null) viewModel.launch(app) else Toast.makeText(context, "Gesture app unavailable", Toast.LENGTH_SHORT).show()
+            }
+            action == "torch" -> {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) toggleTorch() else torchRationale = true
+            }
+            action == "search" -> { initialQuery = ""; screen = "search" }
+            action == "settings" -> screen = "settings"
+            action == "widgets" -> screen = "widgets"
+            action == "groups" -> screen = "groups"
+            action in setOf("notifications", "quick_settings", "lock") -> {
                 val systemAction = when (action) {
                     "notifications" -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
                     "quick_settings" -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
@@ -255,6 +292,13 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
         }
         }
     }
+    if (torchRationale) AlertDialog(
+        onDismissRequest = { torchRationale = false },
+        title = { Text("Toggle the torch") },
+        text = { Text("Orbit needs camera access to switch the torch. It does not take photos or record video.") },
+        confirmButton = { TextButton(onClick = { torchRationale = false; torchPermission.launch(Manifest.permission.CAMERA) }) { Text("Continue") } },
+        dismissButton = { TextButton(onClick = { torchRationale = false }) { Text("Not now") } },
+    )
     if (contactsRationale) AlertDialog(
         onDismissRequest = { contactsRationale = false },
         title = { Text("Search contacts") },

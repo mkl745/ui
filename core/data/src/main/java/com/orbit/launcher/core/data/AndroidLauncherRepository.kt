@@ -90,7 +90,8 @@ private val ICON_PACK = stringPreferencesKey("icon_pack")
 private val WALLPAPER_ENABLED = booleanPreferencesKey("wallpaper_enabled")
 private val WALLPAPER_PARALLAX = booleanPreferencesKey("wallpaper_parallax")
 private val BLUR_STRENGTH = intPreferencesKey("blur_strength")
-private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
+private val gestureActions = setOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock", "torch")
+private fun validGesture(value: String) = value in gestureActions || (value.startsWith("app:") && value.length in 5..1028)
 
 @Singleton
 class AndroidLauncherRepository @Inject constructor(
@@ -195,13 +196,13 @@ class AndroidLauncherRepository @Inject constructor(
             it[CORNER_RADIUS] = settings.cornerRadius.coerceIn(0, 32)
             it[ICON_SHAPE] = settings.iconShape.takeIf { value -> value in setOf("circle", "squircle", "teardrop", "square") } ?: "circle"
             it[THEMED_ICONS] = settings.themedIcons
-            it[SWIPE_UP] = settings.swipeUp.takeIf { v -> v in gestureActions } ?: "none"
-            it[SWIPE_DOWN] = settings.swipeDown.takeIf { v -> v in gestureActions } ?: "none"
-            it[SWIPE_LEFT] = settings.swipeLeft.takeIf { v -> v in gestureActions } ?: "none"
-            it[SWIPE_RIGHT] = settings.swipeRight.takeIf { v -> v in gestureActions } ?: "none"
-            it[DOUBLE_TAP] = settings.doubleTap.takeIf { v -> v in gestureActions } ?: "none"
-            it[EMPTY_LONG_PRESS] = settings.emptyLongPress.takeIf { v -> v in gestureActions } ?: "none"
-            it[TWO_FINGER] = settings.twoFinger.takeIf { v -> v in gestureActions } ?: "none"
+            it[SWIPE_UP] = settings.swipeUp.takeIf { v -> validGesture(v) } ?: "none"
+            it[SWIPE_DOWN] = settings.swipeDown.takeIf { v -> validGesture(v) } ?: "none"
+            it[SWIPE_LEFT] = settings.swipeLeft.takeIf { v -> validGesture(v) } ?: "none"
+            it[SWIPE_RIGHT] = settings.swipeRight.takeIf { v -> validGesture(v) } ?: "none"
+            it[DOUBLE_TAP] = settings.doubleTap.takeIf { v -> validGesture(v) } ?: "none"
+            it[EMPTY_LONG_PRESS] = settings.emptyLongPress.takeIf { v -> validGesture(v) } ?: "none"
+            it[TWO_FINGER] = settings.twoFinger.takeIf { v -> validGesture(v) } ?: "none"
             it[CONTACT_SEARCH] = settings.contactSearch
             it[CONTEXT_SUGGESTIONS] = settings.contextSuggestions
             it[DOCUMENT_TREE] = settings.documentTree

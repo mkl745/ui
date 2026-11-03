@@ -113,14 +113,14 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPack
         Spacer(Modifier.height(16.dp))
         Text("Gestures", style = MaterialTheme.typography.titleMedium)
         Text("Swipe left and right still rotate the rings when their action is None.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-        GestureSetting("Swipe up", settings.swipeUp) { onChange(settings.copy(swipeUp = it)) }
-        GestureSetting("Swipe down", settings.swipeDown) { onChange(settings.copy(swipeDown = it)) }
-        GestureSetting("Swipe left", settings.swipeLeft) { onChange(settings.copy(swipeLeft = it)) }
-        GestureSetting("Swipe right", settings.swipeRight) { onChange(settings.copy(swipeRight = it)) }
-        GestureSetting("Double tap", settings.doubleTap) { onChange(settings.copy(doubleTap = it)) }
-        GestureSetting("Long press empty space", settings.emptyLongPress) { onChange(settings.copy(emptyLongPress = it)) }
-        GestureSetting("Two fingers", settings.twoFinger) { onChange(settings.copy(twoFinger = it)) }
-        Text("Notifications, quick settings and screen lock require the optional Orbit accessibility service. It does not read screen content.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+        GestureSetting("Swipe up", settings.swipeUp, apps) { onChange(settings.copy(swipeUp = it)) }
+        GestureSetting("Swipe down", settings.swipeDown, apps) { onChange(settings.copy(swipeDown = it)) }
+        GestureSetting("Swipe left", settings.swipeLeft, apps) { onChange(settings.copy(swipeLeft = it)) }
+        GestureSetting("Swipe right", settings.swipeRight, apps) { onChange(settings.copy(swipeRight = it)) }
+        GestureSetting("Double tap", settings.doubleTap, apps) { onChange(settings.copy(doubleTap = it)) }
+        GestureSetting("Long press empty space", settings.emptyLongPress, apps) { onChange(settings.copy(emptyLongPress = it)) }
+        GestureSetting("Two fingers", settings.twoFinger, apps) { onChange(settings.copy(twoFinger = it)) }
+        Text("Notifications, quick settings and screen lock require the optional Orbit accessibility service; torch requests camera access. It does not read screen content.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
         TextButton(onClick = onAccessibilitySettings) { Text("Manage gesture accessibility") }
         Spacer(Modifier.height(16.dp))
         Text("Notification badges", style = MaterialTheme.typography.titleMedium)
@@ -160,15 +160,18 @@ fun SettingsScreen(settings: LauncherSettings, apps: List<LauncherApp>, iconPack
 
 
 @Composable
-private fun GestureSetting(label: String, value: String, onChange: (String) -> Unit) {
+private fun GestureSetting(label: String, value: String, apps: List<LauncherApp>, onChange: (String) -> Unit) {
     var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val actions = listOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock")
+    val actions = listOf("none", "search", "settings", "widgets", "groups", "notifications", "quick_settings", "lock", "torch")
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, modifier = Modifier.weight(1f))
         Box {
-            TextButton(onClick = { expanded = true }) { Text(value.replace('_', ' ')) }
+            TextButton(onClick = { expanded = true }) { Text(if (value.startsWith("app:")) apps.firstOrNull { it.key == value.removePrefix("app:") }?.label ?: "Unavailable app" else value.replace('_', ' ')) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 actions.forEach { action -> DropdownMenuItem(text = { Text(action.replace('_', ' ')) }, onClick = { expanded = false; onChange(action) }) }
+                apps.filterNot { it.hidden }.sortedBy { it.label.lowercase() }.forEach { app ->
+                    DropdownMenuItem(text = { Text("Open ${app.label}" + if (app.isWorkProfile) " · Work" else "") }, onClick = { expanded = false; onChange("app:${app.key}") })
+                }
             }
         }
     }
