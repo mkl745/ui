@@ -15,6 +15,7 @@ data class LauncherApp(
     val lastLaunched: Long = 0,
     val searchOnly: Boolean = false,
     val groupName: String? = null,
+    val customIconUri: String? = null,
 )
 
 data class IconPack(val packageName: String, val label: String)
@@ -63,6 +64,7 @@ interface LauncherRepository {
     suspend fun setLabel(app: LauncherApp, label: String?)
     suspend fun setSearchOnly(app: LauncherApp, searchOnly: Boolean)
     suspend fun setGroup(app: LauncherApp, group: String?)
+    suspend fun setCustomIcon(app: LauncherApp, uri: String?)
     suspend fun updateSettings(settings: LauncherSettings)
 }
 

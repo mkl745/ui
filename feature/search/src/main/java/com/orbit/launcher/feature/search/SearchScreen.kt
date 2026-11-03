@@ -83,7 +83,7 @@ fun SearchScreen(apps: List<LauncherApp>, settings: LauncherSettings, initialQue
             if (results.isNotEmpty()) item { Text("APPS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp)) }
             items(results, key = { it.key }) { app ->
                 val pixels = with(LocalDensity.current) { 40.dp.roundToPx() }
-                val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack) { value = loadIcon(app, pixels) }
+                val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack, app.customIconUri) { value = loadIcon(app, pixels) }
                 Row(Modifier.fillMaxWidth().clickable { onLaunch(app) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = null, modifier = Modifier.size(40.dp)) else Spacer(Modifier.size(40.dp))
                     Spacer(Modifier.width(16.dp))

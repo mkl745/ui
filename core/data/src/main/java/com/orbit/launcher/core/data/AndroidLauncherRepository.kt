@@ -12,6 +12,8 @@ import android.media.AudioManager
 import android.os.BatteryManager
 import java.util.Calendar
 import android.content.pm.LauncherApps
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -152,6 +154,7 @@ class AndroidLauncherRepository @Inject constructor(
                 lastLaunched = preference?.lastLaunched ?: 0,
                 searchOnly = preference?.searchOnly ?: false,
                 groupName = preference?.groupName,
+                customIconUri = preference?.customIconUri,
             )
         }
     }
@@ -269,6 +272,7 @@ class AndroidLauncherRepository @Inject constructor(
     override suspend fun setLabel(app: LauncherApp, label: String?) = update(app) { it.copy(customLabel = label?.trim()?.takeIf(String::isNotEmpty)?.take(100)) }
     override suspend fun setSearchOnly(app: LauncherApp, searchOnly: Boolean) = update(app) { it.copy(searchOnly = searchOnly) }
     override suspend fun setGroup(app: LauncherApp, group: String?) = update(app) { it.copy(groupName = group?.trim()?.takeIf(String::isNotEmpty)?.take(60)) }
+    override suspend fun setCustomIcon(app: LauncherApp, uri: String?) = update(app) { it.copy(customIconUri = uri?.take(4096)) }
 
     override suspend fun launch(app: LauncherApp): Boolean {
         val component = ComponentName.unflattenFromString(app.componentName) ?: return false
@@ -338,12 +342,21 @@ class AndroidLauncherRepository @Inject constructor(
         } else 0
         @Suppress("DEPRECATION")
         val packUpdatedAt = if (settings.iconPack.isBlank()) 0L else try { context.packageManager.getPackageInfo(settings.iconPack, 0).lastUpdateTime } catch (_: android.content.pm.PackageManager.NameNotFoundException) { 0L }
-        val cacheKey = "${settings.iconPack}:$packUpdatedAt:${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
+        val cacheKey = "${app.customIconUri}:${settings.iconPack}:$packUpdatedAt:${app.key}:$pixels:${settings.themedIcons}:${settings.palette}:${settings.dynamicColor}:${settings.themeMode}:$night:$dynamicAccent:$updatedAt"
         iconCache.get(cacheKey) ?: (if (updatedAt != 0L) diskCache.read(cacheKey, pixels) else null)?.also { iconCache.put(cacheKey, it) } ?: try {
             val profile = user(app.userSerial) ?: return@withContext null
             val info = launcher.getActivityList(app.packageName, profile).firstOrNull {
                 it.componentName.flattenToString() == app.componentName
             } ?: return@withContext null
+            val custom = app.customIconUri?.let { loadCustomIcon(it, pixels) }
+            if (custom != null) {
+                val result = if (app.isWorkProfile) {
+                    val drawable = android.graphics.drawable.BitmapDrawable(context.resources, custom)
+                    context.packageManager.getUserBadgedIcon(drawable, profile).toBitmap(pixels, pixels, Bitmap.Config.ARGB_8888)
+                } else custom
+                iconCache.put(cacheKey, result)
+                return@withContext result
+            }
             val packed = if (settings.iconPack.isNotBlank()) iconPacks.icon(settings.iconPack, app.componentName) else null
             val badgedPacked = if (packed != null && app.isWorkProfile) context.packageManager.getUserBadgedIcon(packed, profile) else packed
             val adaptive = if (badgedPacked == null && Build.VERSION.SDK_INT >= 33 && settings.themedIcons && !app.isWorkProfile) info.getIcon(0) as? AdaptiveIconDrawable else null
@@ -370,6 +383,19 @@ class AndroidLauncherRepository @Inject constructor(
             bitmap.also { iconCache.put(cacheKey, it); if (updatedAt != 0L) diskCache.write(cacheKey, it) }
         } catch (_: SecurityException) { null }
     }
+
+    private fun loadCustomIcon(value: String, pixels: Int): Bitmap? = try {
+        val uri = Uri.parse(value)
+        if (uri.scheme != "content") return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        if (bounds.outWidth !in 1..16384 || bounds.outHeight !in 1..16384) return null
+        var sample = 1
+        while (bounds.outWidth / sample > pixels * 2 || bounds.outHeight / sample > pixels * 2) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+        Bitmap.createScaledBitmap(bitmap, pixels, pixels, true)
+    } catch (_: Exception) { null }
 }
 
 @Module
@@ -395,6 +421,10 @@ object DatabaseModule {
             }, object : Migration(3, 4) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("CREATE TABLE IF NOT EXISTS `usage_context` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `appKey` TEXT NOT NULL, `hour` INTEGER NOT NULL, `weekday` INTEGER NOT NULL, `charging` INTEGER NOT NULL, `headphones` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL)")
+                }
+            }, object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `app_preferences` ADD COLUMN `customIconUri` TEXT")
                 }
             }).build()
     @Provides fun preferences(database: LauncherDatabase): AppPreferenceDao = database.preferences()

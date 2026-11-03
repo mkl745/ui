@@ -71,6 +71,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     var groupName by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     var contactsRationale by remember { mutableStateOf(false) }
+    var pendingIconKey by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val homeFocus = remember { FocusRequester() }
@@ -128,6 +129,16 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.settings(viewModel.settings.value.copy(contactSearch = granted))
     }
+    val iconPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val app = viewModel.apps.value.firstOrNull { it.key == pendingIconKey }
+        pendingIconKey = ""
+        if (uri != null && app != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                viewModel.customIcon(app, uri.toString())
+            } catch (_: SecurityException) { Toast.makeText(context, "Could not keep icon access", Toast.LENGTH_SHORT).show() }
+        }
+    }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             try {
@@ -184,7 +195,7 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
             screen = "search"
             true
         } else false
-    }.focusRequester(homeFocus).focusable(), color = if (settings.wallpaperEnabled && screen == "home") Color.Transparent else MaterialTheme.colorScheme.background) {
+    }.focusRequester(homeFocus).focusable(), color = if (settings.wallpaperEnabled) { if (screen == "home") Color.Transparent else MaterialTheme.colorScheme.background.copy(alpha = .85f) } else MaterialTheme.colorScheme.background) {
         AnimatedContent(targetState = screen, label = "launcher screen", transitionSpec = {
             if (settings.reduceMotion) EnterTransition.None togetherWith ExitTransition.None
             else (fadeIn(spring()) + scaleIn(spring(), initialScale = .97f)) togetherWith (fadeOut(spring()) + scaleOut(spring(), targetScale = .97f))
@@ -276,6 +287,8 @@ fun LauncherAppScreen(viewModel: LauncherViewModel, homeRequests: Int, widgetHos
                         }
                         TextButton(onClick = { viewModel.pin(app); selected = null }) { Text(if (app.pinned) "Unpin from inner orbit" else "Pin to inner orbit") }
                         TextButton(onClick = { newName = app.label; renaming = true }) { Text("Rename") }
+                        TextButton(onClick = { pendingIconKey = app.key; selected = null; iconPicker.launch(arrayOf("image/*")) }) { Text("Choose custom icon") }
+                        if (app.customIconUri != null) TextButton(onClick = { viewModel.customIcon(app, null); selected = null }) { Text("Reset icon") }
                         TextButton(onClick = { groupName = app.groupName.orEmpty(); grouping = true }) { Text("Move to group") }
                         TextButton(onClick = { viewModel.searchOnly(app); selected = null }) { Text(if (app.searchOnly) "Show in orbit" else "Search only") }
                         TextButton(onClick = { viewModel.hide(app); selected = null }) { Text("Hide app") }

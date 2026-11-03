@@ -24,7 +24,7 @@ class BackupManager @Inject constructor(
         dao.all().forEach { item ->
             entries.put(JSONObject().put("key", item.key).put("pinned", item.pinned).put("hidden", item.hidden)
                 .put("label", item.customLabel ?: JSONObject.NULL).put("launches", item.launches).put("lastLaunched", item.lastLaunched)
-                .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL))
+                .put("searchOnly", item.searchOnly).put("group", item.groupName ?: JSONObject.NULL).put("customIconUri", item.customIconUri ?: JSONObject.NULL))
         }
         val json = JSONObject().put("version", 1).put("apps", entries).put("settings", JSONObject()
             .put("showLabels", settings.showLabels).put("reduceMotion", settings.reduceMotion).put("iconSize", settings.iconSize).put("webSearch", settings.webSearch)
@@ -67,7 +67,9 @@ class BackupManager @Inject constructor(
             require(launches >= 0 && last >= 0)
             val group = if (!item.has("group") || item.isNull("group")) null else item.getString("group")
             require(group == null || group.length <= 60)
-            AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last, item.optBoolean("searchOnly", false), group)
+            val iconUri = if (!item.has("customIconUri") || item.isNull("customIconUri")) null else item.getString("customIconUri")
+            require(iconUri == null || (iconUri.length <= 4096 && Uri.parse(iconUri).scheme == "content"))
+            AppPreference(key, item.getBoolean("pinned"), item.getBoolean("hidden"), label, launches, last, item.optBoolean("searchOnly", false), group, iconUri)
         }
         require(entries.map { it.key }.distinct().size == entries.size)
         dao.replaceAll(entries)

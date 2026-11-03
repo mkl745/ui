@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -89,7 +90,7 @@ fun OrbitHome(
     DisposableEffect(wallpaper) { onDispose { try { wallpaper.setWallpaperOffsets(view.windowToken, .5f, .5f) } catch (_: RuntimeException) { } } }
     val latestGesture by rememberUpdatedState(onGesture)
     var twoFingerActive by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(if (settings.wallpaperEnabled) Color.Black.copy(alpha = .48f) else MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().background(if (settings.wallpaperEnabled) { if (MaterialTheme.colorScheme.background.luminance() > .5f) Color.White.copy(alpha = .75f) else Color.Black.copy(alpha = .48f) } else MaterialTheme.colorScheme.background).safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text("O R B I T", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
@@ -199,7 +200,7 @@ fun AppOrb(
 ) {
     val density = LocalDensity.current
     val pixels = with(density) { settings.iconSize.dp.roundToPx() }.coerceAtLeast(1)
-    val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack) { value = loadIcon(app, pixels) }
+    val icon by produceState<Bitmap?>(null, app.key, pixels, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack, app.customIconUri) { value = loadIcon(app, pixels) }
     val shape = when (settings.iconShape) {
         "squircle" -> RoundedCornerShape(24)
         "teardrop" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomStartPercent = 50, bottomEndPercent = 8)

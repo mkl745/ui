@@ -22,6 +22,7 @@ data class AppPreference(
     val lastLaunched: Long = 0,
     @ColumnInfo(defaultValue = "0") val searchOnly: Boolean = false,
     val groupName: String? = null,
+    val customIconUri: String? = null,
 )
 
 @Dao
@@ -90,7 +91,7 @@ interface UsageContextDao {
     @Query("DELETE FROM usage_context") suspend fun clear()
 }
 
-@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 4, exportSchema = false)
+@Database(entities = [AppPreference::class, WidgetPlacement::class, UsageContextEntity::class], version = 5, exportSchema = false)
 abstract class LauncherDatabase : RoomDatabase() {
     abstract fun preferences(): AppPreferenceDao
     abstract fun widgets(): WidgetDao

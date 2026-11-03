@@ -33,7 +33,7 @@ fun GroupsScreen(apps: List<LauncherApp>, settings: LauncherSettings, loadIcon: 
                 item(key = "group:$name") { Text(name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 12.dp)) }
                 items(members.sortedBy { it.label.lowercase() }, key = { "app:${it.key}" }) { app ->
                     val size = with(LocalDensity.current) { 40.dp.roundToPx() }
-                    val icon by produceState<Bitmap?>(null, app.key, size, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack) { value = loadIcon(app, size) }
+                    val icon by produceState<Bitmap?>(null, app.key, size, settings.themedIcons, settings.palette, settings.themeMode, settings.dynamicColor, settings.iconPack, app.customIconUri) { value = loadIcon(app, size) }
                     Row(Modifier.fillMaxWidth().combinedClickable(onClick = { onLaunch(app) }, onLongClick = { onMenu(app) }).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (icon != null) Image(icon!!.asImageBitmap(), contentDescription = null, modifier = Modifier.size(40.dp)) else Spacer(Modifier.size(40.dp))
                         Spacer(Modifier.width(16.dp))
